@@ -1,0 +1,19 @@
+#!/usr/bin/env zsh
+
+set -e
+
+# prefs
+remote=Sam@rpi5.local
+# you'll really want SSH public key auth set up
+
+echo syncing project to remote computer
+echo 'set -e ; cd ~/Desktop ; [[ -d deleteme ]] && rm -r deleteme ; [[ -d compilation ]] && mv compilation deleteme' | ssh $remote 'bash -s'
+rsync -a ./ $remote:~/Desktop/compilation
+
+echo building
+ssh $remote 'cd ~/Desktop/compilation; make'
+
+echo bringing results back
+rsync -a $remote:~/Desktop/compilation/ .
+
+echo done
