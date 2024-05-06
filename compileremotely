@@ -7,7 +7,8 @@ remote=Sam@rpi5.local
 # you'll really want SSH public key auth set up
 
 echo syncing project to remote computer
-echo 'set -e ; cd ~/Desktop ; [[ -d deleteme ]] && rm -r deleteme ; [[ -d compilation ]] && mv compilation deleteme' | ssh $remote 'bash -s'
+echo 'set -e' | ssh $remote 'bash -s'
+# echo 'cd ~/Desktop ; [[ -d deleteme ]] && rm -r deleteme ; [[ -d compilation ]] && mv compilation deleteme' | ssh $remote 'bash -s'
 rsync -a ./ $remote:~/Desktop/compilation
 
 echo building
