@@ -43,8 +43,14 @@ bash run.sh
 ### Client Interface
 
 ```sh
-cd interface/client
+cd interface/client-prototype
 npm ci
 npm run build
 # Open index.html in a browser
+```
+
+```sh
+cd interface/client
+npm ci
+npm run dev
 ```
