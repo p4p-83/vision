@@ -39,3 +39,12 @@ bash run.sh
 
 # note that run.sh will call setup.sh first if needed
 ```
+
+### Client Interface
+
+```sh
+cd interface/client
+npm ci
+npm run build
+# Open index.html in a browser
+```
