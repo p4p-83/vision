@@ -54,3 +54,20 @@ cd interface/client
 npm ci
 npm run dev
 ```
+
+## Interfaces
+
+### WebRTC
+
+- WebRTC is used for the real-time low-latency video streaming from MediaMTX on the Raspberry Pi to the web interface.
+- [`WebRtcVideo`](./client/src/components/WebRtcVideo.tsx) is a React component created using the [`Eyevinn/webrtc-player`](https://github.com/Eyevinn/webrtc-player) package to receive the WHEP stream and display it in a `<video>` tag.
+
+### WebSocket
+
+- A WebSocket is used for the real-time low-latency full-duplex data channel between the Raspberry Pi and the web interface.
+- [`socket.ts`](./client/src/lib/socket.ts) implements the API for this data channel.
+
+A message looks like:
+- A `Uint8` byte stream
+- The first byte is the 'tag' that describes the message type
+- The subsequent bytes are an arbitrary payload defined by the message type
