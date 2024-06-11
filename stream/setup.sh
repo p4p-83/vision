@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 mkdir mediamtx
 cd mediamtx
 
