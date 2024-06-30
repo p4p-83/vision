@@ -71,4 +71,5 @@ npm run dev
 #### Protocol Buffers
 
 - [Protocol buffers](https://protobuf.dev/overview/) are used for data exchange.
-- [`pnp.proto`](./client/src/proto/pnp/v1/pnp.proto) defines the serialisation, and `npm run protoc` will re-generate the TypeScript and Julia bindings.
+- See [`p4p-83/protobufs`](https://github.com/p4p-83/protobufs) for the `.proto` definition(s).
+<!-- - [`pnp.proto`](./client/src/proto/pnp/v1/pnp.proto) defines the serialisation, and `npm run protoc` will re-generate the TypeScript and Julia bindings. -->
