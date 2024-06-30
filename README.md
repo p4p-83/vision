@@ -66,8 +66,10 @@ npm run dev
 
 - A WebSocket is used for the real-time low-latency full-duplex data channel between the Raspberry Pi and the web interface.
 - [`socket.ts`](./client/src/lib/socket.ts) implements the API for this data channel.
+- [`socket.jl`](./stream/socket.jl) implements server-side listener.
 
-A message looks like:
-- A `Uint8` byte stream
-- The first byte is the 'tag' that describes the message type
-- The subsequent bytes are an arbitrary payload defined by the message type
+#### Protocol Buffers
+
+- [Protocol buffers](https://protobuf.dev/overview/) are used for data exchange.
+- See [`p4p-83/protobufs`](https://github.com/p4p-83/protobufs) for the `.proto` definition(s).
+<!-- - [`pnp.proto`](./client/src/proto/pnp/v1/pnp.proto) defines the serialisation, and `npm run protoc` will re-generate the TypeScript and Julia bindings. -->
