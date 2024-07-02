@@ -598,13 +598,13 @@ pathDefaults:
 # for example "~^(test1|test2)$" will match both "test1" and "test2",
 # for example "~^prefix" will match all paths that start with "prefix".
 paths:
-  hq:
-    runOnInit: bash -c 'rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate 25 --width 1920 --height 1080 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 1920x1080 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax 25 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
-    runOnInitRestart: yes
-
-  # cm3:
-  #   runOnInit: bash -c 'rpicam-vid --flush --lens-position 10 -t 0 --camera 0 --nopreview --codec yuv420 --framerate 25 --width 2304 --height 1296 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 2304x1296 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax 25 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+  # hq:
+  #   runOnInit: bash -c 'rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate 25 --width 1920 --height 1080 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 1920x1080 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax 25 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
   #   runOnInitRestart: yes
+
+  cm3:
+    runOnInit: bash -c 'rpicam-vid --flush --lens-position 10 -t 0 --camera 0 --nopreview --codec yuv420 --framerate 25 --width 2304 --height 1296 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 2304x1296 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax 25 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+    runOnInitRestart: yes
 
   # Settings under path "all_others" are applied to all paths that
   # do not match another entry.
