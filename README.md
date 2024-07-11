@@ -50,6 +50,7 @@ npm run build
 ```
 
 ```sh
+git submodule update --init
 cd interface/client
 npm ci
 npm run dev
