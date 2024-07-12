@@ -1,5 +1,8 @@
 # `interface`
 
+> [!NOTE]
+> Refer to [`p4p.jamesnzl.xyz/learn`](https://p4p.jamesnzl.xyz/learn) for full details.
+
 This repository contains the user interface for our pick-and-place machine.
 
 At present, it also contains the setup scripts to produce the [MediaMTX](https://github.com/bluenviron/mediamtx) real-time media server used to stream real-time video from the Raspberry Pi's camera(s).
@@ -33,6 +36,7 @@ Firstly, clone this repository. Set up [SSH Agent Forwarding](https://docs.githu
 ### Video Real-Time Streaming
 
 ```sh
+# TODO: configure HTTPS forward proxy
 cd interface/streaming
 bash setup.sh
 bash run.sh
