@@ -15,7 +15,7 @@
 # BUGS for some reason `start()` seems to fail every second time, just like clockwork (FFmpeg error Could not write header for output file #0 (incorrect codec parameters ?): Invalid data found when processing input     Error initializing output stream 0:0 --)
 # BUGS running `start()` too soon after `stop()` fails (error seems to be that the RTSP port couldn't be aquired / had yet to be released:     Connection to tcp://localhost:8554?timeout=0 failed: Connection refused       Could not write header for output file #0 (incorrect codec parameters ?): Connection refused      Error initializing output stream 0:0 --)
 
-using Base.Threads, ImageCore, ImageShow, Images, Test, Crayons.Box
+using Base.Threads, ImageCore, ImageShow, Images, Test, Crayons.Box, Serialization
 
 # you need to cd() the REPL (if using) into interface/stream
 # eg `cd("interface/stream")`
@@ -31,8 +31,8 @@ cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
 #* setup
 # video settings
 fps::Int = 25							# Hz
-width::Int = 64*30						# ensure this is a multiple of 64
-height::Int = 64*30						# ensure this is a multiple of 64
+width::Int = 64*16						# ensure this is a multiple of 64
+height::Int = 64*16						# ensure this is a multiple of 64
 # useful constants for post-processing
 bytesPerFrame = Int(width*height*3/2)	# Y channel is width x height; U and V channels are 0.5width x 0.5height
 whq::Int = (width*height)÷4	# quarter width height product (useful for later)
@@ -94,7 +94,12 @@ function main()
 	
 	# variables
 	local ffmpegOutStream, mediaMtxStream, cam1Stream	# forward declare these
+
+	# frame buffer (and more useful views of this)
 	rawFrame = zeros(UInt8, bytesPerFrame)	# preallocate a buffer for primary camera's most recent frame
+	y = reshape(view(rawFrame, 1:(4whq)), width, height)			# `y`, `u`, and `v` are all views
+	u = reshape(view(rawFrame, 4whq.+(1:whq)), width÷2, height÷2)	# we can therefore construct these 3 in advance
+	v = reshape(view(rawFrame, 5whq.+(1:whq)), width÷2, height÷2)	# their underlying data is always linked to `rawFrame`
 
 	try
 		# spawn required processes
@@ -109,12 +114,30 @@ function main()
 		cam1Stream = open(camera1Command, "r")
 		println("started camera" |> MAGENTA_BG)
 		sleep(1)
+
+		# spoof
+		sus = deserialize("suspiciousfile")
+		alpha = sus[1]
+		raw = sus[2]
+		# oy = [reshape(view(r, 1:(4whq)), width, height) for r in raw]
+		# ou = [reshape(view(r, 4whq.+(1:whq)), width÷2, height÷2) for r in raw]
+		# ov = [reshape(view(r, 5whq.+(1:whq)), width÷2, height÷2) for r in raw]
+		overlayFrameNumber = 1
+		overlayLastFrameNumber = length(raw)
+		println("imported overlay" |> MAGENTA_BG)
 	
 		# the main loop that runs once per frame
 		while getDoMainLoop()
 
 			# get a frame (note that this is **blocking**)
 			readbytes!(cam1Stream, rawFrame)
+
+			# composite in place
+			mask = alpha[overlayFrameNumber]
+			data = raw[overlayFrameNumber]
+			rawFrame[mask] = data[mask]
+			overlayFrameNumber += 1
+			if overlayFrameNumber > overlayLastFrameNumber overlayFrameNumber = 1 end
 
 			# "pipe" frame to FFmpeg
 			write(ffmpegOutStream, rawFrame)
