@@ -30,11 +30,13 @@ cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
 
 #* setup
 # video settings
-fps::Int = 25
-width::Int = 64*30
-height::Int = 64*30
-bytesPerFrame = Int(width*height*3/2)
-whq::Int = (width*height)÷4	# quarter width height product
+fps::Int = 25							# Hz
+width::Int = 64*30						# ensure this is a multiple of 64
+height::Int = 64*30						# ensure this is a multiple of 64
+# useful constants for post-processing
+bytesPerFrame = Int(width*height*3/2)	# Y channel is width x height; U and V channels are 0.5width x 0.5height
+whq::Int = (width*height)÷4	# quarter width height product (useful for later)
+# see https://forums.raspberrypi.com/viewtopic.php?p=1978205#p1978782 for further explanation
 
 # camera 1
 camera1Command = `rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
@@ -51,8 +53,6 @@ mediaMtxCommand = `mediamtx/mediamtx`
 # will run this in its own thread so it's easier to send control signals to stop it
 # could just kill it part way through, but this method ensures that the streams always closed
 # and therefore you never get 'resource busy' from the camera
-
-# that said, the main code should most likely be in the main loop for a production version
 
 # run flag & its lock for thread safety
 doMainLoop = false
@@ -153,7 +153,7 @@ function main()
 		try close(ffmpegOutStream); println("closed FFmpeg" |> MAGENTA_BG) 		catch err @warn "couldn't close FFmpeg instance (err $err)" 	end	
 		try close(mediaMtxStream); 	println("closed MediaMTX" |> MAGENTA_BG) 	catch err @warn "couldn't close MediaMTX instance (err $err)" 	end
 	end
-	
+
 	println("All done. Main loop out. Use `start()` if you wish to begin again." |> MAGENTA_BG)
 
 end
