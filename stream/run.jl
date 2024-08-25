@@ -28,27 +28,6 @@ end
 
 cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
 
-#* setup
-# video settings
-fps::Int = 25							# Hz
-width::Int = 64*16						# ensure this is a multiple of 64
-height::Int = 64*16						# ensure this is a multiple of 64
-# useful constants for post-processing
-bytesPerFrame = Int(width*height*3/2)	# Y channel is width x height; U and V channels are 0.5width x 0.5height
-whq::Int = (width*height)÷4	# quarter width height product (useful for later)
-# see https://forums.raspberrypi.com/viewtopic.php?p=1978205#p1978782 for further explanation
-
-# camera 1
-camera1Command = `rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
-
-# FFmpeg
-rtspPort = 8554
-mtxPath = "cm3"
-ffmpegRtspCommand = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
-
-# MediaMTX
-mediaMtxCommand = `mediamtx/mediamtx`
-
 #* MAIN LOOP AND SUPPORTING CODE
 # will run this in its own thread so it's easier to send control signals to stop it
 # could just kill it part way through, but this method ensures that the streams always closed
@@ -88,42 +67,58 @@ stop() = setDoMainLoop(false)
 # it is recommended that you use `start()` to run in a separate thread so you can `stop()` it (don't call `main()` directly)
 function main()
 
-	sleep(1)	# most of these sleeps are to keep the debug messages slightly more organised. Can delete for speed if desired.
-	println("\n\n")
+	sleep(1)
 	println("Started main loop. (Use `stop()` to stop this in future.)" |> MAGENTA_BG)
+
+	# video settings
+	fps::Int = 25							# Hz
+	width::Int = 64*16						# ensure this is a multiple of 64
+	height::Int = 64*16						# ensure this is a multiple of 64
+	# useful constants for post-processing
+	bytesPerFrame = Int(width*height*3/2)	# Y channel is width x height; U and V channels are 0.5width x 0.5height
+	wh4::Int = (width*height)÷4				# quarter width height product (useful constant for later)
+	# see https://forums.raspberrypi.com/viewtopic.php?p=1978205#p1978782 for further explanation
+
+	# camera 1
+	camera1Command = `rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
+
+	# FFmpeg
+	rtspPort = 8554
+	mtxPath = "cm3"
+	ffmpegRtspCommand = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
+
+	# MediaMTX
+	mediaMtxCommand = `mediamtx/mediamtx`
 	
-	# variables
+	# process control objects need to be in this scope
 	local ffmpegOutStream, mediaMtxStream, cam1Stream	# forward declare these
-
-	# frame buffer (and more useful views of this)
-	rawFrame = zeros(UInt8, bytesPerFrame)	# preallocate a buffer for primary camera's most recent frame
-	y = reshape(view(rawFrame, 1:(4whq)), width, height)			# `y`, `u`, and `v` are all views
-	u = reshape(view(rawFrame, 4whq.+(1:whq)), width÷2, height÷2)	# we can therefore construct these 3 in advance
-	v = reshape(view(rawFrame, 5whq.+(1:whq)), width÷2, height÷2)	# their underlying data is always linked to `rawFrame`
-
+	
 	try
+		
 		# spawn required processes
 		mediaMtxStream = open(mediaMtxCommand, "r")
 		println("started MediaMTX" |> MAGENTA_BG)
-		sleep(1)	# sleep to let MediaMTX start before we try to get FFmpeg to connect to it
+		sleep(0.5)											# sleep to let MediaMTX start before we try to get FFmpeg to connect to it
 		
 		ffmpegOutStream = open(ffmpegRtspCommand, "r+")
 		println("started FFmpeg" |> MAGENTA_BG)
-		sleep(1)
 		
 		cam1Stream = open(camera1Command, "r")
 		println("started camera" |> MAGENTA_BG)
-		sleep(1)
 
-		# spoof
-		sus = deserialize("suspiciousfile")
-		alpha = sus[1]
-		raw = sus[2]
-		# oy = [reshape(view(r, 1:(4whq)), width, height) for r in raw]
-		# ou = [reshape(view(r, 4whq.+(1:whq)), width÷2, height÷2) for r in raw]
-		# ov = [reshape(view(r, 5whq.+(1:whq)), width÷2, height÷2) for r in raw]
-		overlayFrameNumber = 1
-		overlayLastFrameNumber = length(raw)
+		# frame buffer
+		rawFrame = zeros(UInt8, bytesPerFrame)				# preallocate a buffer for primary camera's most recent frame
+
+		# spoof stuff
+		rawOverlayFrames = deserialize("compositing test file")[2]								# import some test frames so we can see if it works
+		overlayLastFrameNumber = length(rawOverlayFrames)										# loop limit
+		overlayFrameNumber = 1																	#         … and counter
+
+		uv2yIndexLUT = reshape(1:(4wh4), width, height)[1:2:end, 1:2:end][:]					# LUT to get the y coordinate corresponding to a given u or v coordinate
+		y2uvIndexLUT = repeat(reshape(1:(width*height÷2÷2), width÷2, height÷2), inner=[2,2])[:]	# LUT to get the u or v coordinate corresponding to a given y coordinate
+		maskY = zeros(Bool, 4wh4)																# pixelwise compositing mask (raw luma channel)
+		maskYUV = view(maskY, [1:(4wh4); uv2yIndexLUT; uv2yIndexLUT])							# pixelwise compositing mask (raw format, all channels)
+
 		println("imported overlay" |> MAGENTA_BG)
 	
 		# the main loop that runs once per frame
@@ -133,14 +128,17 @@ function main()
 			readbytes!(cam1Stream, rawFrame)
 
 			# composite in place
-			mask = alpha[overlayFrameNumber]
-			data = raw[overlayFrameNumber]
-			rawFrame[mask] = data[mask]
-			overlayFrameNumber += 1
+			maskY .= .!(rawOverlayFrames[overlayFrameNumber][1:(4wh4)] .≈ 16.0)			# update maskY (maskYUV uses same underlying values)
+																						# NOTE THAT THAT BROADCASTING DOT (i.e.	`maskY .= `, NOT `maskY = `)
+																						# IS ABSOLUTELY ESSENTIAL FOR CORRECT OPERATION
+
+			rawFrame[maskYUV] = rawOverlayFrames[overlayFrameNumber][maskYUV]			# composite within mask
+
+			overlayFrameNumber += 1														# advance to next frame for the next frame of underlying video
 			if overlayFrameNumber > overlayLastFrameNumber overlayFrameNumber = 1 end
 
 			# "pipe" frame to FFmpeg
-			write(ffmpegOutStream, rawFrame)
+			write(ffmpegOutStream, rawFrame)											# frames sent here end up at the web front end
 
 			# do CV processing on frame
 			# Could either do this synchronously (to this thread) by calling into the processing function.
