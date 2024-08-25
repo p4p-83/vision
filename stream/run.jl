@@ -128,6 +128,7 @@ function main()
 			readbytes!(cam1Stream, rawFrame)
 
 			# composite in place
+			#? probably I should do all of this in the same C code that processes centroids? Could only speed things up
 			maskY .= .!(rawOverlayFrames[overlayFrameNumber][1:(4wh4)] .== 16)			# update maskY (maskYUV uses same underlying values)
 																						# NOTE THAT THAT BROADCASTING DOT (i.e.	`maskY .= `, NOT `maskY = `)
 																						# IS ABSOLUTELY ESSENTIAL FOR CORRECT OPERATION
@@ -154,7 +155,8 @@ function main()
 
 			# sleep for a bit
 			# do this if other threads need locked resources (because readbytes! busy waits)
-			sleep(1/fps/8) 	# one eighth of frame period (1 sec / fps / fraction)
+			#! don't think this is actually necessary with the code in its present state — no resources to coordinate
+			# sleep(1/fps/8) 	# one eighth of frame period (1 sec / fps / fraction)
 							# don't want this too small, lest the other threads struggle to line up a lock
 							# don't want this too big, as we may on occasion need to pipe / process multiple frames
 							# 	in one camera frame period in order to catch up (if we somehow fall behind)
@@ -185,4 +187,5 @@ end
 	println("\n\nrun `start()` when you're ready to start streaming." |> GREEN_FG)
 	println("run `stop()` to wrap up and stop streaming")
 	println("use `exit()` to close the Julia session (don't do this before you've stopped the stream.)\n")
+	println("note that this code is multithreaded, and you currently have $(n=nthreads()) thread$(n==1 ? "" : "s") allocated to Julia. You can change this with $("export JULIA_NUM_THREADS=2" |> ITALICS) in the shell (before opening the REPL) or by setting $("\"julia.NumThreads\": 2" |> ITALICS) in the host machine's VS Code settings.json.")
 end)()
