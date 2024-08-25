@@ -604,7 +604,7 @@ paths:
 
   cm3:
     # --lens-position 10
-    # runOnInit: bash -c 'echo localhost:$RTSP_PORT/$MTX_PATH; rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate 25 --width 1280 --height 720 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 1280x720 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax 25 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
+    # runOnInit: bash -c 'rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate 25 --width 1280 --height 720 --inline --listen -o - | ffmpeg -f rawvideo -pix_fmt yuv420p -s:v 1280x720 -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax 25 -f rtsp rtsp://localhost:$RTSP_PORT/$MTX_PATH'
     # runOnInitRestart: yes
 
   # Settings under path "all_others" are applied to all paths that
