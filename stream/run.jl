@@ -15,7 +15,7 @@
 # BUGS for some reason `start()` seems to fail every second time, just like clockwork (FFmpeg error Could not write header for output file #0 (incorrect codec parameters ?): Invalid data found when processing input     Error initializing output stream 0:0 --)
 # BUGS running `start()` too soon after `stop()` fails (error seems to be that the RTSP port couldn't be aquired / had yet to be released:     Connection to tcp://localhost:8554?timeout=0 failed: Connection refused       Could not write header for output file #0 (incorrect codec parameters ?): Connection refused      Error initializing output stream 0:0 --)
 
-using Base.Threads, ImageCore, ImageShow, Images, Test, Crayons.Box, Serialization
+using Base.Threads, Images, Test, Crayons.Box, Serialization
 
 # you need to cd() the REPL (if using) into interface/stream
 # eg `cd("interface/stream")`
