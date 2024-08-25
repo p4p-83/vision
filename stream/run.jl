@@ -15,7 +15,7 @@
 # BUGS for some reason `start()` seems to fail every second time, just like clockwork (FFmpeg error Could not write header for output file #0 (incorrect codec parameters ?): Invalid data found when processing input     Error initializing output stream 0:0 --)
 # BUGS running `start()` too soon after `stop()` fails (error seems to be that the RTSP port couldn't be aquired / had yet to be released:     Connection to tcp://localhost:8554?timeout=0 failed: Connection refused       Could not write header for output file #0 (incorrect codec parameters ?): Connection refused      Error initializing output stream 0:0 --)
 
-using Base.Threads, ImageCore, ImageShow, Images, Test
+using Base.Threads, ImageCore, ImageShow, Images, Test, Crayons.Box
 
 # you need to cd() the REPL (if using) into interface/stream
 # eg `cd("interface/stream")`
@@ -138,16 +138,26 @@ function withCamera(f::Function; cameraNum=0)
 end
 
 function main()
-	
-	println("Started main loop. (Use `stop()` to stop this in future.)")
+
+	sleep(1)
+	println("\n\n")
+	println("Started main loop. (Use `stop()` to stop this in future.)" |> MAGENTA_BG)
 	
 	local ffmpegOutStream, mediaMtxStream, cam1Stream
 	rawFrame = zeros(UInt8, bytesPerFrame)	# primary camera most recent frame
 
 	try
-		ffmpegOutStream = try open(ffmpegRtspCommand) 	catch err @error "couldn't start FFmpeg (err $err)" 	end;	println("started FFmpeg")
-		mediaMtxStream 	= try open(mediaMtxCommand) 	catch err @error "couldn't start MediaMTX (err $err)" 	end; 	println("started MediaMTX")
-		cam1Stream 		= try open(videoStreamCommand) 	catch err @error "couldn't start camera 1 (err $err)" 	end;	println("started camera")
+		mediaMtxStream = open(mediaMtxCommand, "r")
+		println("started MediaMTX" |> MAGENTA_BG)
+		sleep(1)
+		
+		ffmpegOutStream = open(ffmpegRtspCommand, "r+")
+		println("started FFmpeg" |> MAGENTA_BG)
+		sleep(1)
+		
+		cam1Stream = open(videoStreamCommand, "r")
+		println("started camera" |> MAGENTA_BG)
+		sleep(1)
 	
 		while getDoMainLoop()
 
@@ -158,6 +168,14 @@ function main()
 
 			# "pipe" frame to FFmpeg
 			write(ffmpegOutStream, rawFrame)
+
+			# y = reshape(view(rawFrame, 1:(4whq)), width, height)			# `y`, `u`, and `v` are all views
+			# u = reshape(view(rawFrame, 4whq.+(1:whq)), width÷2, height÷2)	# we can therefore construct these 3 in advance
+			# v = reshape(view(rawFrame, 5whq.+(1:whq)), width÷2, height÷2)	# their underlying data is always linked to `f`
+			# y2 = Float32.(y')
+			# u2 = repeat(u', inner=[2,2])
+			# v2 = repeat(v', inner=[2,2])
+			# display(colorview(YCbCr, y2, u2, v2))
 
 			# do CV processing on frame
 			# Could either do this synchronously (to this thread) by calling into the processing function.
@@ -179,17 +197,17 @@ function main()
 							# 	in one camera frame period in order to catch up (if we somehow fall behind)
 
 		end
-		println("Got stop signal. Closing up.")
+		println("Got stop signal. Closing up." |> MAGENTA_BG)
 
 	catch err
 		println("got error $err")
 
 	finally
-		try close(cam1Stream); 		println("closed camera") 	catch err @warn "couldn't close camera stream (err $err)" 		end
-		try close(mediaMtxStream); 	println("closed MediaMTX") 	catch err @warn "couldn't close MediaMTX instance (err $err)" 	end
-		try close(ffmpegOutStream); println("closed FFmpeg") 	catch err @warn "couldn't close FFmpeg instance (err $err)" 	end	
+		try close(cam1Stream); 		println("closed camera" |> MAGENTA_BG) 	catch err @warn "couldn't close camera stream (err $err)" 		end
+		try close(ffmpegOutStream); println("closed FFmpeg" |> MAGENTA_BG) 	catch err @warn "couldn't close FFmpeg instance (err $err)" 	end	
+		try close(mediaMtxStream); 	println("closed MediaMTX" |> MAGENTA_BG) 	catch err @warn "couldn't close MediaMTX instance (err $err)" 	end
 	end
-	println("All done. Main loop out. Use `start()` if you wish to begin again.")
+	println("All done. Main loop out. Use `start()` if you wish to begin again." |> MAGENTA_BG)
 
 end
 
@@ -198,3 +216,16 @@ end
 function displayImage(rawFrame)
 	# TODO
 end
+
+
+
+
+# ##
+
+# m = open(mediaMtxCommand)
+# p = open(pipeline(videoStreamCommand, ffmpegRtspCommand))
+
+# ##
+
+# close(p)
+# close(m)
