@@ -28,19 +28,23 @@ end
 
 cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
 
-# setup
+#* setup
+# video settings
 fps::Int = 25
 width::Int = 64*30
 height::Int = 64*30
 bytesPerFrame = Int(width*height*3/2)
 whq::Int = (width*height)÷4	# quarter width height product
 
-videoStreamCommand = `rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
+# camera 1
+camera1Command = `rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
 
+# FFmpeg
 rtspPort = 8554
 mtxPath = "cm3"
 ffmpegRtspCommand = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
 
+# MediaMTX
 mediaMtxCommand = `mediamtx/mediamtx`
 
 #* MAIN LOOP AND SUPPORTING CODE
@@ -50,9 +54,11 @@ mediaMtxCommand = `mediamtx/mediamtx`
 
 # that said, the main code should most likely be in the main loop for a production version
 
+# run flag & its lock for thread safety
 doMainLoop = false
 doMainLoop_lock = ReentrantLock()
 
+# threadsafe function to set the doMainLoop var
 function setDoMainLoop(state)
 	global doMainLoop, doMainLoop_lock
 	lock(doMainLoop_lock) do 
@@ -60,6 +66,7 @@ function setDoMainLoop(state)
 	end
 end
 
+# threadsafe function to read the doMainLoop var
 function getDoMainLoop()
 	global doMainLoop, doMainLoop_lock
 	return lock(doMainLoop_lock) do
@@ -67,115 +74,50 @@ function getDoMainLoop()
 	end
 end
 
+# function to start the main loop (in a separate thread)
 function start()
 	@test getDoMainLoop() == false # can't start if already started
 	setDoMainLoop(true)
 	@async main()
 end
 
+# function to stop the main loop (in its separate thread)
 stop() = setDoMainLoop(false)
 
-function withMediaMtx(f::Function)
-	local mediaMtxStream
-	try
-		try
-			mediaMtxStream = open(mediaMtxCommand)
-		catch
-			@error "MediaMTX didn't start"
-		end
-
-		println("started MediaMTX")
-		f()
-	
-	finally
-		try
-			close(mediaMtxStream)
-		catch
-			@warn "MediaMTX didn't close nicely"
-		end
-	end
-end
-
-function withFfmpeg(f::Function)
-	local ffmpegOutStream
-	try
-		try
-			ffmpegOutStream = open(ffmpegRtspCommand)
-		catch
-			@error "FFmpeg didn't start"
-		end
-		println("started FFmpeg")
-		f(ffmpegOutStream)
-
-	finally
-		try
-			close(ffmpegOutStream)
-		catch
-			@warn "FFmpeg didn't close nicely"
-		end
-	end
-end
-
-function withCamera(f::Function; cameraNum=0)
-	local yuvStream
-	try
-		try
-			yuvStream = open(videoStreamCommand) # primary camera Y'UV a.k.a. Y'CbCr stream
-		catch
-			@error "camera $cameraNum didn't start"
-		end
-
-		println("started camera $cameraNum")
-		f(yuvStream)
-
-	finally
-		try
-			close(yuvStream)
-		catch
-			@warn "camera $cameraNum didn't close nicely"
-		end
-	end
-end
-
+# main loop
+# it is recommended that you use `start()` to run in a separate thread so you can `stop()` it (don't call `main()` directly)
 function main()
 
-	sleep(1)
+	sleep(1)	# most of these sleeps are to keep the debug messages slightly more organised. Can delete for speed if desired.
 	println("\n\n")
 	println("Started main loop. (Use `stop()` to stop this in future.)" |> MAGENTA_BG)
 	
-	local ffmpegOutStream, mediaMtxStream, cam1Stream
-	rawFrame = zeros(UInt8, bytesPerFrame)	# primary camera most recent frame
+	# variables
+	local ffmpegOutStream, mediaMtxStream, cam1Stream	# forward declare these
+	rawFrame = zeros(UInt8, bytesPerFrame)	# preallocate a buffer for primary camera's most recent frame
 
 	try
+		# spawn required processes
 		mediaMtxStream = open(mediaMtxCommand, "r")
 		println("started MediaMTX" |> MAGENTA_BG)
-		sleep(1)
+		sleep(1)	# sleep to let MediaMTX start before we try to get FFmpeg to connect to it
 		
 		ffmpegOutStream = open(ffmpegRtspCommand, "r+")
 		println("started FFmpeg" |> MAGENTA_BG)
 		sleep(1)
 		
-		cam1Stream = open(videoStreamCommand, "r")
+		cam1Stream = open(camera1Command, "r")
 		println("started camera" |> MAGENTA_BG)
 		sleep(1)
 	
+		# the main loop that runs once per frame
 		while getDoMainLoop()
 
-			# println("frame loop")
-
-			# get a frame
+			# get a frame (note that this is **blocking**)
 			readbytes!(cam1Stream, rawFrame)
 
 			# "pipe" frame to FFmpeg
 			write(ffmpegOutStream, rawFrame)
-
-			# y = reshape(view(rawFrame, 1:(4whq)), width, height)			# `y`, `u`, and `v` are all views
-			# u = reshape(view(rawFrame, 4whq.+(1:whq)), width÷2, height÷2)	# we can therefore construct these 3 in advance
-			# v = reshape(view(rawFrame, 5whq.+(1:whq)), width÷2, height÷2)	# their underlying data is always linked to `f`
-			# y2 = Float32.(y')
-			# u2 = repeat(u', inner=[2,2])
-			# v2 = repeat(v', inner=[2,2])
-			# display(colorview(YCbCr, y2, u2, v2))
 
 			# do CV processing on frame
 			# Could either do this synchronously (to this thread) by calling into the processing function.
@@ -197,35 +139,21 @@ function main()
 							# 	in one camera frame period in order to catch up (if we somehow fall behind)
 
 		end
+
 		println("Got stop signal. Closing up." |> MAGENTA_BG)
 
 	catch err
+		# need to do this otherwise all errors within the try block go magically invisble, which isn't particularly helpful
 		println("got error $err")
 
 	finally
-		try close(cam1Stream); 		println("closed camera" |> MAGENTA_BG) 	catch err @warn "couldn't close camera stream (err $err)" 		end
-		try close(ffmpegOutStream); println("closed FFmpeg" |> MAGENTA_BG) 	catch err @warn "couldn't close FFmpeg instance (err $err)" 	end	
+		# always close all 3 streams even if the try code above errors
+		# wrap in further try/catches to ensure that one failed close operation doesn't stop any other subsequent ones
+		try close(cam1Stream); 		println("closed camera" |> MAGENTA_BG) 		catch err @warn "couldn't close camera stream (err $err)" 		end
+		try close(ffmpegOutStream); println("closed FFmpeg" |> MAGENTA_BG) 		catch err @warn "couldn't close FFmpeg instance (err $err)" 	end	
 		try close(mediaMtxStream); 	println("closed MediaMTX" |> MAGENTA_BG) 	catch err @warn "couldn't close MediaMTX instance (err $err)" 	end
 	end
+	
 	println("All done. Main loop out. Use `start()` if you wish to begin again." |> MAGENTA_BG)
 
 end
-
-#* OTHER ROUTINES
-
-function displayImage(rawFrame)
-	# TODO
-end
-
-
-
-
-# ##
-
-# m = open(mediaMtxCommand)
-# p = open(pipeline(videoStreamCommand, ffmpegRtspCommand))
-
-# ##
-
-# close(p)
-# close(m)
