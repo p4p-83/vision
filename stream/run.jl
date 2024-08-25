@@ -4,7 +4,7 @@
 # sets up MediaMTX and tees the camera data to both CV as desired and FFmpeg
 
 # running this code:
-# the main logic of this code is set up to run in a seperate thread for dev purposes
+# the main logic of this code is set up to run in a separate thread for dev purposes
 # the best way to run this in a testing environment is to load up a REPL session
 # and evaluate this code, either with VS Code, with `julia -i run.jl`, or with `include("run.jl")`
 
@@ -128,7 +128,7 @@ function main()
 			readbytes!(cam1Stream, rawFrame)
 
 			# composite in place
-			maskY .= .!(rawOverlayFrames[overlayFrameNumber][1:(4wh4)] .≈ 16.0)			# update maskY (maskYUV uses same underlying values)
+			maskY .= .!(rawOverlayFrames[overlayFrameNumber][1:(4wh4)] .== 16)			# update maskY (maskYUV uses same underlying values)
 																						# NOTE THAT THAT BROADCASTING DOT (i.e.	`maskY .= `, NOT `maskY = `)
 																						# IS ABSOLUTELY ESSENTIAL FOR CORRECT OPERATION
 
@@ -143,7 +143,7 @@ function main()
 			# do CV processing on frame
 			# Could either do this synchronously (to this thread) by calling into the processing function.
 			# If this doesn't delay the following thread too much then that CV process can pass the computed output data
-			# to a seperate logic thread using a Channel (see `help?> Channel`).
+			# to a separate logic thread using a Channel (see `help?> Channel`).
 			# That or we just `deepcopy(…` the raw frame into a threadsafe secondary buffer and then let all of the CV happen
 			# in another thread.
 			# I'm not sure at this point which of these options is most favourable. Probably we just pick one and
@@ -178,3 +178,11 @@ function main()
 	println("All done. Main loop out. Use `start()` if you wish to begin again." |> MAGENTA_BG)
 
 end
+
+# @async (function notes()
+(function notes()
+	sleep(0.25)
+	println("\n\nrun `start()` when you're ready to start streaming." |> GREEN_FG)
+	println("run `stop()` to wrap up and stop streaming")
+	println("use `exit()` to close the Julia session (don't do this before you've stopped the stream.)\n")
+end)()
