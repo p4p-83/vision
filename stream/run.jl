@@ -1,0 +1,200 @@
+# run.jl
+# 25 Aug '24
+# the main application logic for the streaming and (eventually) CV
+# sets up MediaMTX and tees the camera data to both CV as desired and FFmpeg
+
+# running this code:
+# the main logic of this code is set up to run in a seperate thread for dev purposes
+# the best way to run this in a testing environment is to load up a REPL session
+# and evaluate this code, either with VS Code, with `julia -i run.jl`, or with `include("run.jl")`
+
+# then once you have a REPL with this code as above, you can control things with
+# `start()` to kick everything off
+# `stop()` to shut down gracefully (note that you may have to type this blindly — there may be stuff getting printed to stderr — but if you don't spell it wrong it will work despite this)
+
+# BUGS for some reason `start()` seems to fail every second time, just like clockwork (FFmpeg error Could not write header for output file #0 (incorrect codec parameters ?): Invalid data found when processing input     Error initializing output stream 0:0 --)
+# BUGS running `start()` too soon after `stop()` fails (error seems to be that the RTSP port couldn't be aquired / had yet to be released:     Connection to tcp://localhost:8554?timeout=0 failed: Connection refused       Could not write header for output file #0 (incorrect codec parameters ?): Connection refused      Error initializing output stream 0:0 --)
+
+using Base.Threads, ImageCore, ImageShow, Images, Test
+
+# you need to cd() the REPL (if using) into interface/stream
+# eg `cd("interface/stream")`
+@test split(pwd(), "/")[end-1:end] == ["interface", "stream"]
+
+# filesystem setup (replaces run.sh)
+if !isdir("mediamtx")
+	run(`bash setup.sh`)
+end
+
+cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
+
+# setup
+fps::Int = 25
+width::Int = 64*30
+height::Int = 64*30
+bytesPerFrame = Int(width*height*3/2)
+whq::Int = (width*height)÷4	# quarter width height product
+
+videoStreamCommand = `rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
+
+rtspPort = 8554
+mtxPath = "cm3"
+ffmpegRtspCommand = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
+
+mediaMtxCommand = `mediamtx/mediamtx`
+
+#* MAIN LOOP AND SUPPORTING CODE
+# will run this in its own thread so it's easier to send control signals to stop it
+# could just kill it part way through, but this method ensures that the streams always closed
+# and therefore you never get 'resource busy' from the camera
+
+# that said, the main code should most likely be in the main loop for a production version
+
+doMainLoop = false
+doMainLoop_lock = ReentrantLock()
+
+function setDoMainLoop(state)
+	global doMainLoop, doMainLoop_lock
+	lock(doMainLoop_lock) do 
+		doMainLoop = state
+	end
+end
+
+function getDoMainLoop()
+	global doMainLoop, doMainLoop_lock
+	return lock(doMainLoop_lock) do
+		return doMainLoop
+	end
+end
+
+function start()
+	@test getDoMainLoop() == false # can't start if already started
+	setDoMainLoop(true)
+	@async main()
+end
+
+stop() = setDoMainLoop(false)
+
+function withMediaMtx(f::Function)
+	local mediaMtxStream
+	try
+		try
+			mediaMtxStream = open(mediaMtxCommand)
+		catch
+			@error "MediaMTX didn't start"
+		end
+
+		println("started MediaMTX")
+		f()
+	
+	finally
+		try
+			close(mediaMtxStream)
+		catch
+			@warn "MediaMTX didn't close nicely"
+		end
+	end
+end
+
+function withFfmpeg(f::Function)
+	local ffmpegOutStream
+	try
+		try
+			ffmpegOutStream = open(ffmpegRtspCommand)
+		catch
+			@error "FFmpeg didn't start"
+		end
+		println("started FFmpeg")
+		f(ffmpegOutStream)
+
+	finally
+		try
+			close(ffmpegOutStream)
+		catch
+			@warn "FFmpeg didn't close nicely"
+		end
+	end
+end
+
+function withCamera(f::Function; cameraNum=0)
+	local yuvStream
+	try
+		try
+			yuvStream = open(videoStreamCommand) # primary camera Y'UV a.k.a. Y'CbCr stream
+		catch
+			@error "camera $cameraNum didn't start"
+		end
+
+		println("started camera $cameraNum")
+		f(yuvStream)
+
+	finally
+		try
+			close(yuvStream)
+		catch
+			@warn "camera $cameraNum didn't close nicely"
+		end
+	end
+end
+
+function main()
+	
+	println("Started main loop. (Use `stop()` to stop this in future.)")
+	
+	local ffmpegOutStream, mediaMtxStream, cam1Stream
+	rawFrame = zeros(UInt8, bytesPerFrame)	# primary camera most recent frame
+
+	try
+		ffmpegOutStream = try open(ffmpegRtspCommand) 	catch err @error "couldn't start FFmpeg (err $err)" 	end;	println("started FFmpeg")
+		mediaMtxStream 	= try open(mediaMtxCommand) 	catch err @error "couldn't start MediaMTX (err $err)" 	end; 	println("started MediaMTX")
+		cam1Stream 		= try open(videoStreamCommand) 	catch err @error "couldn't start camera 1 (err $err)" 	end;	println("started camera")
+	
+		while getDoMainLoop()
+
+			# println("frame loop")
+
+			# get a frame
+			readbytes!(cam1Stream, rawFrame)
+
+			# "pipe" frame to FFmpeg
+			write(ffmpegOutStream, rawFrame)
+
+			# do CV processing on frame
+			# Could either do this synchronously (to this thread) by calling into the processing function.
+			# If this doesn't delay the following thread too much then that CV process can pass the computed output data
+			# to a seperate logic thread using a Channel (see `help?> Channel`).
+			# That or we just `deepcopy(…` the raw frame into a threadsafe secondary buffer and then let all of the CV happen
+			# in another thread.
+			# I'm not sure at this point which of these options is most favourable. Probably we just pick one and
+			# see how it goes, but at any rate, this is the place to put the first bit of logic:
+			# TODO
+			#? maybe this is where I just directly call into my centroids finding C code?
+			# then put the output of that down the channel?
+
+			# sleep for a bit
+			# do this if other threads need locked resources (because readbytes! busy waits)
+			sleep(1/fps/8) 	# one eighth of frame period (1 sec / fps / fraction)
+							# don't want this too small, lest the other threads struggle to line up a lock
+							# don't want this too big, as we may on occasion need to pipe / process multiple frames
+							# 	in one camera frame period in order to catch up (if we somehow fall behind)
+
+		end
+		println("Got stop signal. Closing up.")
+
+	catch err
+		println("got error $err")
+
+	finally
+		try close(cam1Stream); 		println("closed camera") 	catch err @warn "couldn't close camera stream (err $err)" 		end
+		try close(mediaMtxStream); 	println("closed MediaMTX") 	catch err @warn "couldn't close MediaMTX instance (err $err)" 	end
+		try close(ffmpegOutStream); println("closed FFmpeg") 	catch err @warn "couldn't close FFmpeg instance (err $err)" 	end	
+	end
+	println("All done. Main loop out. Use `start()` if you wish to begin again.")
+
+end
+
+#* OTHER ROUTINES
+
+function displayImage(rawFrame)
+	# TODO
+end
