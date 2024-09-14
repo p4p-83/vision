@@ -3,3 +3,6 @@
 mediamtx/
 node_modules/
 dist/
+
+bin
+.o

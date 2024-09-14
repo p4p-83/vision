@@ -1,0 +1,8 @@
+#!/usr/bin/env zsh
+
+set -e
+
+remote=Sam@rpi5.local
+
+rsync -a ./ $remote:~/Desktop/compilation
+ssh $remote '~/Desktop/compilation/bin/vision'
