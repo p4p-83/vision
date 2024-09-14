@@ -1,8 +1,0 @@
-#/bin/bash
-
-set -e
-
-git clone https://git.libcamera.org/libcamera/libcamera.git
-cd libcamera
-meson setup build
-sudo ninja -C build install
