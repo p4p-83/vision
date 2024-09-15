@@ -35,7 +35,7 @@ Firstly, clone this repository. Set up [SSH Agent Forwarding](https://docs.githu
 
 ```sh
 cd stream
-julia -i stream/run.jl
+julia -i run.jl
 > start()
 # before shut down
 > stop()

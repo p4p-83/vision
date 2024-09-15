@@ -17,9 +17,9 @@
 
 using Base.Threads, Images, Test, Crayons.Box, Serialization
 
-# you need to cd() the REPL (if using) into interface/stream
-# eg `cd("interface/stream")`
-@test split(pwd(), "/")[end-1:end] == ["interface", "stream"]
+# you need to cd() the REPL (if using) into vision/stream
+# eg `cd("vision/stream")`
+@test split(pwd(), "/")[end-1:end] == ["vision", "stream"]
 
 # filesystem setup (replaces run.sh)
 if !isdir("mediamtx")
