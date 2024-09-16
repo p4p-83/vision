@@ -160,62 +160,35 @@ typedef struct frame {
 	uint8_t v[WIDTH/2][HEIGHT/2];
 } frame;
 
-typedef struct mask {
-	uint8_t a[WIDTH][HEIGHT];
-} mask;
+typedef uint8_t (mask)[WIDTH][HEIGHT];
 
 void acceleratedCompositingMaskingLoop(
-	rawFrameWithName(frameA),
-	rawFrameWithName(frameB),
-	rawFrameWithName(frameOut),
-	grayFrameWithName(maskA),
-	grayFrameWithName(maskB)
+	frame fboard,
+	frame fcomp,
+	frame fout,
+	mask mboard,
+	mask mcomp
 ) {
-
-	// define helper macros
-	#define pixelsInLumaChannel (WIDTH*HEIGHT)
-	#define pixelsInChromaChannel ((WIDTH*HEIGHT)/4)
-
-	#define pixelsBeforeY (0)
-	#define pixelsBeforeU (pixelsBeforeY+pixelsInLumaChannel)
-	#define pixelsBeforeV (pixelsBeforeU+pixelsInLumaChannel)
-
-	// typedef uint8_t (*lumaChannel)[width][height];
-	// typedef uint8_t (chromaChannel)[width/2][height/2];
-	// uint8_t (* frame1luma)[width][height] = (uint8_t (*)[width][height])&frameA[0];
-
-	frame *fa = (frame *)frameA;
-	fa->y[0][0] = 0;
 	
 	for (int x = 0; x < WIDTH; ++x) for (int y = 0; y < HEIGHT; ++y) {
-		
-		// #define pixelY(frame) (((lumaChannel)(frame+pixelsBeforeY)))[x][y]
-		// #define pixelU(frame) (((chromaChannel)(frame+pixelsBeforeU)))[x/2][y/2]
-		// #define pixelV(frame) (((chromaChannel)(frame+pixelsBeforeV)))[x/2][y/2]
 
-		// https://stackoverflow.com/a/2565048
-		#define pixelY(frame) ((frame)[pixelsBeforeY + HEIGHT*x + y])
-		#define pixelU(frame) ((frame)[pixelsBeforeU + (HEIGHT/2)*(x/2) + (y/2)])
-		#define pixelV(frame) ((frame)[pixelsBeforeV + (HEIGHT/2)*(x/2) + (y/2)])
-		
+		const int lumax = x, lumay = y, chromax = x/2, chromay = y/2;
 		#define mean(pixel1, pixel2) ((typeof(pixel1))(((int)(pixel1)+(int)pixel2)/2))
+		
+		#define thisY(frame) frame.y[lumax][lumay]
+		#define thisU(frame) frame.u[chromax][chromay]
+		#define thisV(frame) frame.v[chromax][chromay]
 
-		pixelY(frameOut) = mean(pixelY(frameA), pixelY(frameB));
-		pixelU(frameOut) = mean(pixelU(frameA), pixelU(frameB));
-		pixelV(frameOut) = mean(pixelV(frameA), pixelV(frameB));
+		thisY(fout) = mean(thisY(fcomp), thisY(fboard));
+		thisU(fout) = mean(thisU(fcomp), thisU(fboard));
+		thisV(fout) = mean(thisV(fcomp), thisV(fboard));
 
-		#undef pixelY
-		#undef pixelU
-		#undef pixelV
+		mboard[x][y] = (thisY(fboard) >= MASK_BOARD_CUT_IN) && (thisY(fboard) <= MASK_BOARD_CUT_OUT);
+		mcomp[x][y] = (thisY(fcomp) >= MASK_COMP_CUT_IN) && (thisY(fcomp) <= MASK_COMP_CUT_OUT);
+
+		#undef mean
 
 	}
-
-	// manually remove helper macros from "scope"
-	#undef pixelsInLumaChannel
-	#undef pixelsInChromaChannel
-	#undef pixelsBeforeY
-	#undef pixelsBeforeU
-	#undef pixelsBeforeV
 
 }
 
