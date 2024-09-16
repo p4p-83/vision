@@ -183,10 +183,16 @@ void acceleratedCompositingMaskingLoop(
 		thisU(fout) = mean(thisU(fcomp), thisU(fboard));
 		thisV(fout) = mean(thisV(fcomp), thisV(fboard));
 
-		mboard[x][y] = (thisY(fboard) >= MASK_BOARD_CUT_IN) && (thisY(fboard) <= MASK_BOARD_CUT_OUT);
-		mcomp[x][y] = (thisY(fcomp) >= MASK_COMP_CUT_IN) && (thisY(fcomp) <= MASK_COMP_CUT_OUT);
+		#define inRange(value, lowerBound, upperBound) (((value) >= (lowerBound)) && ((value) <= (upperBound)))
+
+		mboard[x][y] = inRange(thisY(fboard), MASK_BOARD_CUT_IN, MASK_BOARD_CUT_OUT);
+		mcomp[x][y] = inRange(thisY(fcomp), MASK_COMP_CUT_IN, MASK_COMP_CUT_OUT);
 
 		#undef mean
+		#undef thisY
+		#undef thisU
+		#undef thisV
+		#undef inRange
 
 	}
 
