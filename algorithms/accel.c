@@ -151,8 +151,8 @@ int findPads(int width, int height, int (mat)[width][height], Centroid *centroid
 
 // }
 
-#define rawFrameWithName(name) uint8_t (name)[(WIDTH * HEIGHT * 3) / 2]
-#define grayFrameWithName(name) uint8_t (name)[WIDTH][HEIGHT]
+
+
 
 typedef struct frame {
 	uint8_t y[WIDTH][HEIGHT];
@@ -173,20 +173,22 @@ void acceleratedCompositingMaskingLoop(
 	for (int x = 0; x < WIDTH; ++x) for (int y = 0; y < HEIGHT; ++y) {
 
 		const int lumax = x, lumay = y, chromax = x/2, chromay = y/2;
-		#define mean(pixel1, pixel2) ((typeof(pixel1))(((int)(pixel1)+(int)pixel2)/2))
+		#define mean(pixel1, pixel2) ((typeof(pixel1))(((int)(pixel1)+(int)(pixel2))/2))
 		
 		#define thisY(frame) frame.y[lumax][lumay]
 		#define thisU(frame) frame.u[chromax][chromay]
 		#define thisV(frame) frame.v[chromax][chromay]
 
+		// basic compositing
 		thisY(fout) = mean(thisY(fcomp), thisY(fboard));
 		thisU(fout) = mean(thisU(fcomp), thisU(fboard));
 		thisV(fout) = mean(thisV(fcomp), thisV(fboard));
 
-		#define inRange(value, lowerBound, upperBound) (((value) >= (lowerBound)) && ((value) <= (upperBound)))
+		#define isInRange(value, lowerBound, upperBound) (((value) >= (lowerBound)) && ((value) <= (upperBound)))
 
-		mboard[x][y] = inRange(thisY(fboard), MASK_BOARD_CUT_IN, MASK_BOARD_CUT_OUT);
-		mcomp[x][y] = inRange(thisY(fcomp), MASK_COMP_CUT_IN, MASK_COMP_CUT_OUT);
+		// basic masking
+		mboard[x][y] = isInRange(thisY(fboard), MASK_BOARD_CUT_IN, MASK_BOARD_CUT_OUT);
+		mcomp[x][y] = isInRange(thisY(fcomp), MASK_COMP_CUT_IN, MASK_COMP_CUT_OUT);
 
 		#undef mean
 		#undef thisY
@@ -198,4 +200,16 @@ void acceleratedCompositingMaskingLoop(
 
 }
 
+// for visualisation and testing purposes
+// converts a mask to a raw frame suitable for piping to FFmpeg.
+void mask2frame(mask in, frame out) {
 
+	for (int x = 0; x < WIDTH; ++x) for (int y = 0; y < HEIGHT; ++y) {
+
+		out.y[x][y] = in[x][y] ? 255 : 0;
+		out.u[x/2][y/2] = 128;
+		out.v[y/2][y/2] = 128;
+
+	}
+
+}
