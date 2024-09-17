@@ -21,6 +21,8 @@ using Base.Threads, Images, Test, Crayons.Box, Serialization
 # eg `cd("vision/stream")`
 @test split(pwd(), "/")[end-1:end] == ["vision", "stream"]
 
+include("../algorithms/accel.jl")
+
 # filesystem setup (replaces run.sh)
 if !isdir("mediamtx")
 	run(`bash setup.sh`)
@@ -56,12 +58,16 @@ end
 # function to start the main loop (in a separate thread)
 function start()
 	@test getDoMainLoop() == false # can't start if already started
+	accel_load()
 	setDoMainLoop(true)
 	@async main()
 end
 
 # function to stop the main loop (in its separate thread)
-stop() = setDoMainLoop(false)
+function stop()
+	setDoMainLoop(false)
+	accel_unload()
+end
 
 # main loop
 # it is recommended that you use `start()` to run in a separate thread so you can `stop()` it (don't call `main()` directly)
@@ -71,7 +77,7 @@ function main()
 	println("Started main loop. (Use `stop()` to stop this in future.)" |> MAGENTA_BG)
 
 	# video settings
-	fps::Int = 25							# Hz
+	fps::Int = 15							# Hz
 	width::Int = 64*16						# ensure this is a multiple of 64
 	height::Int = 64*16						# ensure this is a multiple of 64
 	# useful constants for post-processing
@@ -81,6 +87,8 @@ function main()
 
 	# camera 1
 	camera1Command = `rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
+	
+	camera2Command = `rpicam-vid --flush -t 0 --camera 1 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
 
 	# FFmpeg
 	rtspPort = 8554
@@ -104,42 +112,33 @@ function main()
 		println("started FFmpeg" |> MAGENTA_BG)
 		
 		cam1Stream = open(camera1Command, "r")
-		println("started camera" |> MAGENTA_BG)
+		println("started camera 1" |> MAGENTA_BG)
+		
+		cam2Stream = open(camera2Command, "r")
+		println("started camera 2" |> MAGENTA_BG)
 
 		# frame buffer
 		rawFrame = zeros(UInt8, bytesPerFrame)				# preallocate a buffer for primary camera's most recent frame
+		rawFrame2 = zeros(UInt8, bytesPerFrame)
 
-		# spoof stuff
-		rawOverlayFrames = deserialize("compositing test file")[2]								# import some test frames so we can see if it works
-		overlayLastFrameNumber = length(rawOverlayFrames)										# loop limit
-		overlayFrameNumber = 1																	#         … and counter
-
-		uv2yIndexLUT = reshape(1:(4wh4), width, height)[1:2:end, 1:2:end][:]					# LUT to get the y coordinate corresponding to a given u or v coordinate
-		y2uvIndexLUT = repeat(reshape(1:(width*height÷2÷2), width÷2, height÷2), inner=[2,2])[:]	# LUT to get the u or v coordinate corresponding to a given y coordinate
-		maskY = zeros(Bool, 4wh4)																# pixelwise compositing mask (raw luma channel)
-		maskYUV = view(maskY, [1:(4wh4); uv2yIndexLUT; uv2yIndexLUT])							# pixelwise compositing mask (raw format, all channels)
-
-		println("imported overlay" |> MAGENTA_BG)
+		# pre-allocate
+		outFrame = zeros(UInt8, bytesPerFrame)
+		maskA = zeros(UInt8, height, width)
+		maskB = zeros(UInt8, height, width)
 	
 		# the main loop that runs once per frame
 		while getDoMainLoop()
 
 			# get a frame (note that this is **blocking**)
 			readbytes!(cam1Stream, rawFrame)
+			readbytes!(cam2Stream, rawFrame2)
 
 			# composite in place
-			#? probably I should do all of this in the same C code that processes centroids? Could only speed things up
-			maskY .= .!(rawOverlayFrames[overlayFrameNumber][1:(4wh4)] .== 16)			# update maskY (maskYUV uses same underlying values)
-																						# NOTE THAT THAT BROADCASTING DOT (i.e.	`maskY .= `, NOT `maskY = `)
-																						# IS ABSOLUTELY ESSENTIAL FOR CORRECT OPERATION
-
-			rawFrame[maskYUV] = rawOverlayFrames[overlayFrameNumber][maskYUV]			# composite within mask
-
-			overlayFrameNumber += 1														# advance to next frame for the next frame of underlying video
-			if overlayFrameNumber > overlayLastFrameNumber overlayFrameNumber = 1 end
+			acceleratedCompositingMaskingLoop!(rawFrame, rawFrame2, outFrame, maskA, maskB)
+			mask2frame!(maskA, outFrame)
 
 			# "pipe" frame to FFmpeg
-			write(ffmpegOutStream, rawFrame)											# frames sent here end up at the web front end
+			write(ffmpegOutStream, outFrame)											# frames sent here end up at the web front end
 
 			# do CV processing on frame
 			# Could either do this synchronously (to this thread) by calling into the processing function.
@@ -167,12 +166,13 @@ function main()
 
 	catch err
 		# need to do this otherwise all errors within the try block go magically invisble, which isn't particularly helpful
-		println("got error $err")
+		println("got error $err" |> WHITE_FG |> RED_BG)
 
 	finally
 		# always close all 3 streams even if the try code above errors
 		# wrap in further try/catches to ensure that one failed close operation doesn't stop any other subsequent ones
-		try close(cam1Stream); 		println("closed camera" |> MAGENTA_BG) 		catch err @warn "couldn't close camera stream (err $err)" 		end
+		try close(cam1Stream); 		println("closed camera 1" |> MAGENTA_BG) 		catch err @warn "couldn't close camera 1 stream (err $err)" 		end
+		try close(cam2Stream); 		println("closed camera 2" |> MAGENTA_BG) 		catch err @warn "couldn't close camera 2 stream (err $err)" 		end
 		try close(ffmpegOutStream); println("closed FFmpeg" |> MAGENTA_BG) 		catch err @warn "couldn't close FFmpeg instance (err $err)" 	end	
 		try close(mediaMtxStream); 	println("closed MediaMTX" |> MAGENTA_BG) 	catch err @warn "couldn't close MediaMTX instance (err $err)" 	end
 	end

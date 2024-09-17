@@ -1,10 +1,19 @@
 using Base.Threads, Images, Test, Crayons.Box, Serialization
 
-@test split(pwd(), "/")[end] == "vision"
+function ensurePwdCorrect()
+	@test split(pwd(), "/")[end] == "vision"
+end
 
 # MediaMTX setup
-if !isdir("stream/mediamtx") run(`bash setup.sh`) end
-cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
+function ensureMediaMtx()
+	if !isdir("stream/mediamtx") run(`bash setup.sh`) end
+	cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
+end
+
+(function startUpSelfCheck()
+	ensurePwdCorrect()
+	ensureMediaMtx()
+end)()
 
 # camera code
 function cameraThread()
