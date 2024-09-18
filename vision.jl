@@ -11,6 +11,7 @@ include("logic/algorithms.jl")
 
 function usageNotes()
 println("""
+
 ╒═══════════════════════════════════════════════════════════════════════════╕
 │ starting $(" vision.jl " |> GREEN_BG |> WHITE_FG)                                                      │
 │                                                                           │
