@@ -7,3 +7,4 @@ dist/
 bin
 *.o
 *.so
+accel-compile-time-constants.h
