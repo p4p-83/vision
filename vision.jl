@@ -1,9 +1,9 @@
 module Vision
 export beginVision, endVision, getCentroids, getRotations, getWicking
-using Crayons.Box, Test, DataFrames
+using Crayons.Box
 
 #* dependencies
-include("structs.jl")
+include("common.jl")
 include("logic/frameloop.jl")
 include("logic/algorithms.jl")
 
@@ -70,18 +70,5 @@ end
 function endVision()
 	cancelFrameLoop()
 end
-
-#* call functions from here for standalone debugging purposes
-beginVision()
-
-#* keep alive
-# you'll probably want to remove these lines when it comes time to use
-# this module within others
-while true
-	sleep(1)
-	display(DataFrame(Pair.(["leads", "pads"], getCentroids())))
-end
-
-endVision()
 
 end # module Vision

@@ -1,3 +1,6 @@
+j = im
+° = 2π/360	# multiplicative degrees to radians conversion factor
+
 struct Centroid
 	x::Cint
 	y::Cint

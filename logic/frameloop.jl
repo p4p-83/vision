@@ -1,6 +1,3 @@
-j = im
-° = 2π/360	# multiplicative degrees to radians conversion factor
-
 #* user settings
 const fps::Int = 25											# framerate, s⁻¹
 const width::Int = 64*16									# multiples of 64 work best
@@ -42,7 +39,7 @@ runFrameLoopLock::ReentrantLock = ReentrantLock()
 
 #* public assets
 visionCentroidsPrivate::Vector{Vector{Centroid}} = [fill(Centroid(-1,-1,-1), searchMaxNumCentroids) for _ in cameraCommands]
-visionCentroidsLength::Int = 0
+visionCentroidsLength::Vector{Int} = [0 for _ in cameraCommands]
 visionCentroidsLock::ReentrantLock = ReentrantLock()
 
 #* helper functions
@@ -132,7 +129,7 @@ function frameLoop()
 		#* use masks to recalculate centroids
 		@lock visionCentroidsLock for i in eachindex(cameraCommands)
 			# also in C and also acts in place
-			visionCentroidsLength = @ccall accelLib.acceleratedCentroidFinding(
+			visionCentroidsLength[i] = @ccall accelLib.acceleratedCentroidFinding(
 				outputMasks[i]::Ptr{UInt8},
 				visionCentroidsPrivate[i]::Ptr{UInt8}
 			)::Cint
@@ -153,5 +150,6 @@ function cancelFrameLoop()
 end
 
 function getCentroids(cameraNumber::Int)::Vector{Centroid}
-	@lock visionCentroidsLock deepcopy(visionCentroidsPrivate[cameraNumber][1:visionCentroidsLength])
+	global visionCentroidsLock, visionCentroidsPrivate, visionCentroidsLength
+	@lock visionCentroidsLock deepcopy(visionCentroidsPrivate[cameraNumber][1:visionCentroidsLength[cameraNumber]])
 end

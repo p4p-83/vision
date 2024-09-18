@@ -2,6 +2,8 @@
 # also doubles as an example of how you can use vision.jl in another .jl file
 # see the readme for slightly more info
 
+using Statistics, DataFrames, Crayons.Box
+
 include("vision.jl")
 using .Vision
 
@@ -10,8 +12,15 @@ beginVision()
 
 #* keep alive
 while true
-	sleep(1)
-	display(DataFrame(Pair.(["leads", "pads"], getCentroids())))	# make it easier to see CV results
+	sleep(2)
+	println()
+	println()
+	leads, pads = getCentroids()
+	println("\nLeads" |> BOLD |> GREEN_FG)
+	display(DataFrame(leads))
+	println("\nPads" |> BOLD |> GREEN_FG)
+	display(DataFrame(pads))
+	println()
 end
 
 #* stop
