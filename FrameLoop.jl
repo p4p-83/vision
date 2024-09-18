@@ -36,7 +36,7 @@ const cameraCommands::Vector{Cmd} = [
 
 const ffmpegCommand::Cmd = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
 
-const mediaMtxCommand::Cmd = `stream/mediamtx/mediamtx`
+const mediaMtxCommand::Cmd = `bash -c "cd stream/mediamtx; ./mediamtx"`
 
 #* control
 runFrameLoop::Bool = false
@@ -94,16 +94,19 @@ function frameLoop()
 	#* ensure there isn't already an instance obviously running
 	rfl = @lock runFrameLoopLock runFrameLoop
 	if rfl return end
+	
+	#* preallocate frame buffers and mask buffers
+	cameraFrames::Vector{Vector{UInt8}} = [zeros(UInt8, samplesPerFrame) for _ in cameraCommands]
+	outputFrame::Vector{UInt8} = zeros(UInt8, samplesPerFrame)
+	outputMasks::Vector{Matrix{UInt8}} = [zeros(UInt8, height, width) for _ in cameraCommands] #? BUGS is this the right order height,width?
 
 	#* open resources
 	mediamtxIo = open(mediaMtxCommand, "r")
-	ffmpegIo = open(ffmpegCommand, "r+")		# note must be writeable
 	cameraIos = open.(cameraCommands, "r")
-
-	#* preallocate frame buffers and mask buffers
-	cameraFrames = [zeros(UInt8, samplesPerFrame) for _ in cameraIos]
-	outputFrame::Vector{UInt8} = zeros(UInt8, samplesPerFrame)
-	outputMasks::Vector{Matrix{UInt8}} = [zeros(UInt8, height, width) for _ in cameraCommands] #? BUGS is this the right order height,width?
+	ffmpegIo = open(ffmpegCommand, "r+")		# note must be writeable
+	write(ffmpegIo, outputFrame)				# no clue, but it bugs out if I don't do this?!?!
+	
+	sleep(0.5)
 
 	#* repeating loop
 	@lock runFrameLoopLock runFrameLoop = true
@@ -113,34 +116,35 @@ function frameLoop()
 		readbytes!.(cameraIos, cameraFrames)
 
 		#* recalculate output frame and masks
-		# this function is written in C for speed
-		# acts in place
-		@ccall accelLib.acceleratedCompositingMaskingLoop(
-			cameraFrames[1]::Ptr{UInt8},
-			cameraFrames[2]::Ptr{UInt8},
-			outputFrame::Ptr{UInt8},
-			outputMasks[1]::Ptr{UInt8},
-			outputMasks[2]::Ptr{UInt8}
-		)::Cvoid
+		# # this function is written in C for speed
+		# # acts in place
+		# @ccall accelLib.acceleratedCompositingMaskingLoop(
+		# 	cameraFrames[1]::Ptr{UInt8},
+		# 	cameraFrames[2]::Ptr{UInt8},
+		# 	outputFrame::Ptr{UInt8},
+		# 	outputMasks[1]::Ptr{UInt8},
+		# 	outputMasks[2]::Ptr{UInt8}
+		# )::Cvoid
 		
 		#* dispatch composited frame to FFmpeg
-		write(ffmpegIo, outputFrame)
+		# write(ffmpegIo, outputFrame)
+		write(ffmpegIo, cameraFrames[1])
 
 		#* use masks to recalculate centroids
-		@lock visionCentroidsLock for i in eachindex(cameraCommands)
-			# also in C and also acts in place
-			visionCentroidsLength = @ccall accelLib.acceleratedCentroidFinding(
-				outputMasks[i]::Ptr{UInt8},
-				visionCentroidsPrivate[i]::Ptr{UInt8}
-			)::Cint
-		end
+		# @lock visionCentroidsLock for i in eachindex(cameraCommands)
+		# 	# also in C and also acts in place
+		# 	visionCentroidsLength = @ccall accelLib.acceleratedCentroidFinding(
+		# 		outputMasks[i]::Ptr{UInt8},
+		# 		visionCentroidsPrivate[i]::Ptr{UInt8}
+		# 	)::Cint
+		# end
 
 	end
 
 	#* close resources
-	close.(cameraIos)
-	close(ffmpegIo)
 	close(mediamtxIo)
+	close.(cameraIos)
+	close(cameraIo)
 
 end
 

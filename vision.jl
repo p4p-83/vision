@@ -40,3 +40,4 @@ end
 
 #* do the startup automatically
 atStartup()
+atShutdown()
