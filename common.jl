@@ -1,5 +1,5 @@
-j = im
-° = 2π/360	# multiplicative degrees to radians conversion factor
+const j::ComplexF64 = im
+const °::Float64 = 2π/360	# multiplicative degrees to radians conversion factor
 
 struct Centroid
 	x::Cint
