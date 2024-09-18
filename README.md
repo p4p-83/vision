@@ -33,14 +33,15 @@ This repository is included as a submodule in [`p4p-83/controller`](https://gith
 
 Firstly, clone this repository. Set up [SSH Agent Forwarding](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/using-ssh-agent-forwarding) on the Raspberry Pi if needed.
 
+The next step depends on whether you wish to run `vision` in a standalone manner for experimentation, or have it included as a submodule in a wider Julia project.
+
+For standalone testing and experimentation, use `vision-run-standalone.jl` to call vision for you and print some baseline information as it holds the session open for you. Do this at the shell using the following command.
+
 ```sh
-cd stream
-julia -i run.jl
-> start()
-# before shut down
-> stop()
-> exit()
+julia vision-run-standalone.jl
 ```
+
+Alternatively, if you're using this as a submodule in a wider project (e.g. as is done by `controller`), you can do this in the usual Julia way by bringing `vision.jl` itself in as a submodule. This is done by `vision-run-standalone.jl`, so you can use that as a minimal example.
 
 ## Interfaces
 
