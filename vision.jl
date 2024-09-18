@@ -1,14 +1,11 @@
 module Vision
 export beginVision, endVision, getCentroids, getRotations, getWicking
-using Crayons.Box, Test
+using Crayons.Box, Test, DataFrames
 
 #* dependencies
-
+include("structs.jl")
 include("logic/FrameLoop.jl")
-import .FrameLoop
-
-# include("logic/Algorithms.jl")
-# import .Algorithms
+include("logic/Algorithms.jl")
 
 #* internal functions
 
@@ -46,20 +43,20 @@ end
 
 #* data extraction functions
 function getCentroids()::Tuple{Vector{Centroid}, Vector{Centroid}}
-	pads = FrameLoop.getCentroids(1)
-	leads = FrameLoop.getCentroids(2)
+	pads = getCentroids(1)
+	leads = getCentroids(2)
 	return (leads, pads)
 end
 
 function getRotations()::Vector{MachineMovement}
 	leads, pads = getCentroids()
-	movements = Algorithms.findRotation(leads, pads)
+	movements = findRotation(leads, pads)
 	return movement
 end
 
 function getWicking()::MachineMovement
 	leads, pads = getCentroids()
-	movement = Algorithms.wick(leads, pads)
+	movement = wick(leads, pads)
 	return movement
 end
 
@@ -67,11 +64,11 @@ end
 function beginVision()
 	usageNotes()
 	ensureMediaMtx()
-	@async FrameLoop.frameLoop()
+	@async frameLoop()
 end
 
 function endVision()
-	FrameLoop.cancelFrameLoop()
+	cancelFrameLoop()
 end
 
 #* call functions from here for standalone debugging purposes
@@ -82,7 +79,7 @@ beginVision()
 # this module within others
 while true
 	sleep(1)
-	display(getCentroids())
+	display(DataFrame(Pair.(["leads", "pads"], getCentroids())))
 end
 
 endVision()
