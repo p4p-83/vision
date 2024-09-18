@@ -123,6 +123,23 @@ static int splatSearch(mask m, int startX, int startY, Centroid centroidsList[MA
 }
 
 /**
+ * mask2frame
+ * Use this to visualise a mask by converting it to a black-and-white
+ * frame that can be piped to FFmpeg.
+ */
+void mask2frame(mask in, frame out) {
+
+	for (int x = 0; x < WIDTH; ++x) for (int y = 0; y < HEIGHT; ++y) {
+
+		out->y[x][y] = in[x][y] ? 255 : 0;
+		out->u[x/2][y/2] = 128;
+		out->v[y/2][y/2] = 128;
+
+	}
+
+}
+
+/**
  * acceleratedCompositingMaskingLoop
  * Takes the raw camera feeds and works pixelwise to produce the composite video
  * output and the masks for both camera feeds.
@@ -163,7 +180,7 @@ void acceleratedCompositingMaskingLoop(
 
 	}
 
-	// for (int i = 0; i < WIDTH*HEIGHT*3/2; ++i) (uint8_t *)(fout)[i] = 127;
+	// mask2frame(mboard, fout);
 
 }
 
@@ -207,22 +224,5 @@ int acceleratedCentroidFinding(mask m, Centroid centroidsList[MAX_NUM_CENTROIDS]
 	// splatSearch will have already populated centroidsList
 	// just return the length (as tracked by splatSearch)
 	return centroidIndex;
-
-}
-
-/**
- * mask2frame
- * Use this to visualise a mask by converting it to a black-and-white
- * frame that can be piped to FFmpeg.
- */
-void mask2frame(mask in, frame out) {
-
-	for (int x = 0; x < WIDTH; ++x) for (int y = 0; y < HEIGHT; ++y) {
-
-		out->y[x][y] = in[x][y] ? 255 : 0;
-		out->u[x/2][y/2] = 128;
-		out->v[y/2][y/2] = 128;
-
-	}
 
 }

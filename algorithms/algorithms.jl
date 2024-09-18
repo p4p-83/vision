@@ -7,10 +7,7 @@ default( fontfamily="LinLibertine_Rah", size=(720, 720), label="", background_co
 j = im
 ° = 2π/360	# multiplicative degrees to radians conversion factor
 
-struct MachineMovement
-	translation::ComplexF64		# pixels, presumably — TODO standardise
-	rotation::Float64			# radians
-end
+include("../datatypes.jl")
 
 function alignRotation(leads, pads ; choice=1, referenceLeadIndex=1, resolution=3°, selectivity=5, plotting=false)
 	# leads is a list of the lead centroids
