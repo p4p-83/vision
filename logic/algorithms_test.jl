@@ -1,8 +1,12 @@
-using Test, BenchmarkTools
+using Test#, BenchmarkTools
 
-include("./algorithms.jl")
+include("./Algorithms.jl")
+import .Algorithms
 
-@testset "alignRotation dummy resistor 30°" begin
+j = im
+deg = 2π/360	# multiplicative degrees to radians conversion factor
+
+@testset "Algorithms.findRotation dummy resistor 30°" begin
 	rotationalMisalignment = 30deg
 	
 	leads = [
@@ -12,28 +16,28 @@ include("./algorithms.jl")
 
 	pads = copy(leads) .* cis(rotationalMisalignment)
 	
-	correction = alignRotation(leads, pads)
+	correction = Algorithms.findRotation(leads, pads)[1]
 	rotationalCorrection = correction.rotation
 	
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg)
 	
 	pads .+= 0.2 + 0.1j
-	rotationalCorrection = alignRotation(leads, pads).rotation
+	rotationalCorrection = Algorithms.findRotation(leads, pads)[1].rotation
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg)
 	
 	pads .-= 0.3 - 0.1j
-	rotationalCorrection = alignRotation(leads, pads).rotation
+	rotationalCorrection = Algorithms.findRotation(leads, pads)[1].rotation
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg) broken=true
 
 	pads = 1.2copy(leads) .* cis(rotationalMisalignment)
-	rotationalCorrection = alignRotation(leads, pads).rotation
+	rotationalCorrection = Algorithms.findRotation(leads, pads)[1].rotation
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg)
 
 end;
 
 # do not edit directly
 # copy/pasted from above 30° set
-@testset "alignRotation dummy resistor 213°" begin
+@testset "Algorithms.findRotation dummy resistor 213°" begin
 	rotationalMisalignment = 213deg
 	
 	leads = [
@@ -43,29 +47,29 @@ end;
 
 	pads = copy(leads) .* cis(rotationalMisalignment)
 	
-	correction = alignRotation(leads, pads)
+	correction = Algorithms.findRotation(leads, pads)[1]
 	rotationalCorrection = correction.rotation
 	
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg)
 	
 	pads .+= 0.2 + 0.1j
-	rotationalCorrection = alignRotation(leads, pads).rotation
+	rotationalCorrection = Algorithms.findRotation(leads, pads)[1].rotation
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg)
 	
 	pads .-= 0.3 - 0.1j
-	rotationalCorrection = alignRotation(leads, pads).rotation
+	rotationalCorrection = Algorithms.findRotation(leads, pads)[1].rotation
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg) broken=true
 
 	pads = 1.2copy(leads) .* cis(rotationalMisalignment)
-	rotationalCorrection = alignRotation(leads, pads).rotation
+	rotationalCorrection = Algorithms.findRotation(leads, pads)[1].rotation
 	@test isapprox(rotationalCorrection, 360deg-rotationalMisalignment, atol=2deg)
 
 	# benchmark, 'cause I'm interested
-	display(@benchmark alignRotation(leads, pads))
+	#display(@benchmark Algorithms.findRotation(leads, pads))
 
 end;
 
-@testset "wick dummy SOIC8" begin
+@testset "Algorithms.wick dummy SOIC8" begin
 	
 	# demo components to ease test board construction
 	res::Vector{ComplexF64} = [0, 2]
@@ -93,7 +97,7 @@ end;
 	leads .*= cis(-rotationOffset) # component won't be in alignment yet
 	
 	# analyse it
-	move = wick(leads, pads)
+	move = Algorithms.wick(leads, pads)
 	# println(move)
 	
 	# compare with expectations
@@ -103,11 +107,11 @@ end;
 	@test isapprox(move.rotation, expectedCorrectiveRotation, atol=0.01deg)
 	
 	# benchmark, 'cause I'm interested
-	display(@benchmark wick(leads, pads))
+	#display(@benchmark Algorithms.wick(leads, pads))
 
 end;
 
-@testset "wick dummy SOIC8 with scale issue" begin
+@testset "Algorithms.wick dummy SOIC8 with scale issue" begin
 	
 	# demo components to ease test board construction
 	res::Vector{ComplexF64} = [0, 2]
@@ -136,7 +140,7 @@ end;
 	leads .*= cis(-rotationOffset) # component won't be in alignment yet
 	
 	# analyse it
-	move = wick(leads, pads, plotting=false)
+	move = Algorithms.wick(leads, pads, plotting=false)
 	# println(move)
 	
 	# compare with expectations

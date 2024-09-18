@@ -1,12 +1,17 @@
-using Crayons.Box
+module Vision
+export beginVision, endVision, getCentroids, getRotations, getWicking
+using Crayons.Box, Test
 
 #* dependencies
-include("self-checks.jl")
 
-include("FrameLoop.jl")
+include("logic/FrameLoop.jl")
 import .FrameLoop
 
+# include("logic/Algorithms.jl")
+# import .Algorithms
+
 #* internal functions
+
 function usageNotes()
 println("""
 ╒═══════════════════════════════════════════════════════════════════════════╕
@@ -27,22 +32,59 @@ println("""
 """)
 end
 
-#* event functions
-function atStartup()
+# MediaMTX setup
+function ensureMediaMtx()
+	prevwd = pwd()
+	pathToThisFile = @__DIR__
+	cd("$pathToThisFile/stream")
+	
+	if !isdir("mediamtx") run(`bash setup.sh`) end
+	cp("mediamtx.yml", "mediamtx/mediamtx.yml", force=true)
+	
+	cd(prevwd)
+end
+
+#* data extraction functions
+function getCentroids()::Tuple{Vector{Centroid}, Vector{Centroid}}
+	pads = FrameLoop.getCentroids(1)
+	leads = FrameLoop.getCentroids(2)
+	return (leads, pads)
+end
+
+function getRotations()::Vector{MachineMovement}
+	leads, pads = getCentroids()
+	movements = Algorithms.findRotation(leads, pads)
+	return movement
+end
+
+function getWicking()::MachineMovement
+	leads, pads = getCentroids()
+	movement = Algorithms.wick(leads, pads)
+	return movement
+end
+
+#* control functions
+function beginVision()
 	usageNotes()
 	ensureMediaMtx()
 	@async FrameLoop.frameLoop()
 end
 
-function atShutdown()
+function endVision()
 	FrameLoop.cancelFrameLoop()
 end
 
-#* do the startup automatically
-atStartup()
+#* call functions from here for standalone debugging purposes
+beginVision()
 
+#* keep alive
+# you'll probably want to remove these lines when it comes time to use
+# this module within others
 while true
-	sleep(10)
+	sleep(1)
+	display(getCentroids())
 end
 
-atShutdown()
+endVision()
+
+end # module Vision
