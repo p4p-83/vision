@@ -34,7 +34,7 @@ const cameraCommands::Vector{Cmd} = [
 	`rpicam-vid --flush -t 0 --camera 1 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
 ]
 
-const ffmpegCommand::Cmd = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
+const ffmpegCommand::Cmd = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
 
 const mediaMtxCommand::Cmd = `bash -c "cd stream/mediamtx; ./mediamtx"`
 
@@ -61,8 +61,8 @@ function writeCompileTimeConstantsFile()
 
 	// masking
 	#define MASK_BOARD_CUT_IN $(keyingBoardMaskCutInOut[1])
-	#define MASK_COMP_CUT_IN $(keyingBoardMaskCutInOut[2])
-	#define MASK_BOARD_CUT_OUT $(keyingComponentMaskCutInOut[1])
+	#define MASK_COMP_CUT_IN $(keyingComponentMaskCutInOut[1])
+	#define MASK_BOARD_CUT_OUT $(keyingBoardMaskCutInOut[2])
 	#define MASK_COMP_CUT_OUT $(keyingComponentMaskCutInOut[2])
 
 	// centroids algorithm
@@ -116,28 +116,28 @@ function frameLoop()
 		readbytes!.(cameraIos, cameraFrames)
 
 		#* recalculate output frame and masks
-		# # this function is written in C for speed
-		# # acts in place
-		# @ccall accelLib.acceleratedCompositingMaskingLoop(
-		# 	cameraFrames[1]::Ptr{UInt8},
-		# 	cameraFrames[2]::Ptr{UInt8},
-		# 	outputFrame::Ptr{UInt8},
-		# 	outputMasks[1]::Ptr{UInt8},
-		# 	outputMasks[2]::Ptr{UInt8}
-		# )::Cvoid
+		# this function is written in C for speed
+		# acts in place
+		@ccall accelLib.acceleratedCompositingMaskingLoop(
+			cameraFrames[1]::Ptr{UInt8},
+			cameraFrames[2]::Ptr{UInt8},
+			outputFrame::Ptr{UInt8},
+			outputMasks[1]::Ptr{UInt8},
+			outputMasks[2]::Ptr{UInt8}
+		)::Cvoid
 		
 		#* dispatch composited frame to FFmpeg
-		# write(ffmpegIo, outputFrame)
-		write(ffmpegIo, cameraFrames[1])
+		write(ffmpegIo, outputFrame)
+		# write(ffmpegIo, cameraFrames[1])
 
 		#* use masks to recalculate centroids
-		# @lock visionCentroidsLock for i in eachindex(cameraCommands)
-		# 	# also in C and also acts in place
-		# 	visionCentroidsLength = @ccall accelLib.acceleratedCentroidFinding(
-		# 		outputMasks[i]::Ptr{UInt8},
-		# 		visionCentroidsPrivate[i]::Ptr{UInt8}
-		# 	)::Cint
-		# end
+		@lock visionCentroidsLock for i in eachindex(cameraCommands)
+			# also in C and also acts in place
+			visionCentroidsLength = @ccall accelLib.acceleratedCentroidFinding(
+				outputMasks[i]::Ptr{UInt8},
+				visionCentroidsPrivate[i]::Ptr{UInt8}
+			)::Cint
+		end
 
 	end
 
