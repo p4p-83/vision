@@ -4,8 +4,8 @@ using Crayons.Box, Test, DataFrames
 
 #* dependencies
 include("structs.jl")
-include("logic/FrameLoop.jl")
-include("logic/Algorithms.jl")
+include("logic/frameloop.jl")
+include("logic/algorithms.jl")
 
 #* internal functions
 
