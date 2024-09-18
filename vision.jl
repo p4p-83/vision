@@ -31,7 +31,7 @@ end
 function atStartup()
 	usageNotes()
 	ensureMediaMtx()
-	FrameLoop.frameLoop()
+	@async FrameLoop.frameLoop()
 end
 
 function atShutdown()
@@ -40,4 +40,9 @@ end
 
 #* do the startup automatically
 atStartup()
+
+while true
+	sleep(10)
+end
+
 atShutdown()

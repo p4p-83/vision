@@ -87,6 +87,7 @@ end
 #* prepare
 makeAccelerationAvailable()
 
+# the intention is that you would call this with @async to spawn a thread
 function frameLoop()
 	global runFrameLoop, runFrameLoopLock
 	global visionCentroidsPrivate, visionCentroidsLength, visionCentroidsLock
