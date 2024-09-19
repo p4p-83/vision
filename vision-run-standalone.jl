@@ -7,20 +7,32 @@ using Statistics, DataFrames, Crayons.Box
 include("vision.jl")
 using .Vision
 
+function printCentroidsToStdOut()
+
+	leads, pads = getCentroids()
+
+	println("\n\n\nLeads" |> BOLD |> GREEN_FG)
+	display(DataFrame(leads))
+	println("\nPads" |> BOLD |> GREEN_FG)
+	display(DataFrame(pads))
+	println()
+
+end
+
 #* start
 beginVision()
 
 #* keep alive
 while true
-	sleep(2)
-	println()
-	println()
-	leads, pads = getCentroids()
-	println("\nLeads" |> BOLD |> GREEN_FG)
-	display(DataFrame(leads))
-	println("\nPads" |> BOLD |> GREEN_FG)
-	display(DataFrame(pads))
-	println()
+
+	Vision.setFreezeFramed(true)
+	sleep(1)
+	
+	Vision.setFreezeFramed(false)
+	sleep(1)
+
+	printCentroidsToStdOut()
+
 end
 
 #* stop

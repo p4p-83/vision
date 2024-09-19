@@ -180,7 +180,7 @@ void acceleratedCompositingMaskingLoop(
 
 	}
 
-	// mask2frame(mcomp, fout);
+	// mask2frame(mboard, fout);
 
 }
 
