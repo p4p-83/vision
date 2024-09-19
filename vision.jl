@@ -1,11 +1,11 @@
 module Vision
-export beginVision, endVision, getCentroids, getRotations, getWicking
+export beginVision, endVision, getCentroids, setFreezeFramed
 using Crayons.Box
+using Base.Threads
 
 #* dependencies
 include("common.jl")
 include("logic/frameloop.jl")
-include("logic/algorithms.jl")
 
 #* internal functions
 
@@ -34,6 +34,7 @@ end
 function ensureMediaMtx()
 	prevwd = pwd()
 	pathToThisFile = @__DIR__
+
 	cd("$pathToThisFile/stream")
 	
 	if !isdir("mediamtx") run(`bash setup.sh`) end
@@ -49,23 +50,11 @@ function getCentroids()::Tuple{Vector{Centroid}, Vector{Centroid}}
 	return (leads, pads)
 end
 
-function getRotations()::Vector{MachineMovement}
-	leads, pads = getCentroids()
-	movements = findRotation(leads, pads)
-	return movement
-end
-
-function getWicking()::MachineMovement
-	leads, pads = getCentroids()
-	movement = wick(leads, pads)
-	return movement
-end
-
 #* control functions
 function beginVision()
 	usageNotes()
 	ensureMediaMtx()
-	@async frameLoop()
+	@spawn frameLoop()
 end
 
 function endVision()

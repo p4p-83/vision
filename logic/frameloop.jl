@@ -31,11 +31,14 @@ const cameraCommands::Vector{Cmd} = [
 
 const ffmpegCommand::Cmd = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
 
-const mediaMtxCommand::Cmd = `bash -c "cd stream/mediamtx; ./mediamtx"`
+const mediaMtxCommand::Cmd = `bash -c "cd $accelCFileDir/../stream/mediamtx; ./mediamtx"`
 
 #* control
 runFrameLoop::Bool = false
 runFrameLoopLock::ReentrantLock = ReentrantLock()
+
+isFreezeFramed::Bool = false
+isFreezeFramedLock::ReentrantLock = ReentrantLock()
 
 #* public assets
 visionCentroidsPrivate::Vector{Vector{Centroid}} = [fill(Centroid(-1,-1,-1), searchMaxNumCentroids) for _ in cameraCommands]
@@ -72,20 +75,20 @@ function writeCompileTimeConstantsFile()
 end
 
 function makeAccelerationAvailable()
-	
+
 	writeCompileTimeConstantsFile()
 	run(`bash -c "cd '$accelCFileDir'; gcc -std=gnu2x -O3 -c $accelCFileName.c"`)
 	run(`bash -c "cd '$accelCFileDir'; g++ -shared -o $accelCFileName.so $accelCFileName.o -lm -fPIC"`)
 	
 end
 
-#* prepare
-makeAccelerationAvailable()
+#* external functions
 
 # the intention is that you would call this with @async to spawn a thread
 function frameLoop()
 	global runFrameLoop, runFrameLoopLock
 	global visionCentroidsPrivate, visionCentroidsLength, visionCentroidsLock
+	global isFreezeFramed, isFreezeFramedLock
 
 	#* ensure there isn't already an instance obviously running
 	rfl = @lock runFrameLoopLock runFrameLoop
@@ -98,11 +101,12 @@ function frameLoop()
 
 	#* open resources
 	mediamtxIo = open(mediaMtxCommand, "r")
+	sleep(0.2)
 	cameraIos = open.(cameraCommands, "r")
 	ffmpegIo = open(ffmpegCommand, "r+")		# note must be writeable
 	write(ffmpegIo, outputFrame)				# no clue, but it bugs out if I don't do this?!?!
 	
-	sleep(0.5)
+	sleep(0.2)
 
 	#* repeating loop
 	@lock runFrameLoopLock runFrameLoop = true
@@ -112,19 +116,20 @@ function frameLoop()
 		readbytes!.(cameraIos, cameraFrames)
 
 		#* recalculate output frame and masks
-		# this function is written in C for speed
-		# acts in place
-		@ccall accelLib.acceleratedCompositingMaskingLoop(
-			cameraFrames[1]::Ptr{UInt8},
-			cameraFrames[2]::Ptr{UInt8},
-			outputFrame::Ptr{UInt8},
-			outputMasks[1]::Ptr{UInt8},
-			outputMasks[2]::Ptr{UInt8}
-		)::Cvoid
+		if !(@lock isFreezeFramedLock isFreezeFramed)
+			# acts in place
+			# this function is written in C for speed
+			@ccall accelLib.acceleratedCompositingMaskingLoop(
+				cameraFrames[1]::Ptr{UInt8},
+				cameraFrames[2]::Ptr{UInt8},
+				outputFrame::Ptr{UInt8},
+				outputMasks[1]::Ptr{UInt8},
+				outputMasks[2]::Ptr{UInt8}
+			)::Cvoid
+		end
 		
 		#* dispatch composited frame to FFmpeg
 		write(ffmpegIo, outputFrame)
-		# write(ffmpegIo, cameraFrames[1])
 
 		#* use masks to recalculate centroids
 		@lock visionCentroidsLock for i in eachindex(cameraCommands)
@@ -149,7 +154,21 @@ function cancelFrameLoop()
 	@lock runFrameLoopLock runFrameLoop = false
 end
 
+function setFreezeFramed(frozen::Bool)
+	global isFreezeFramed, isFreezeFramedLock
+	@lock isFreezeFramedLock isFreezeFramed = frozen
+end
+
 function getCentroids(cameraNumber::Int)::Vector{Centroid}
 	global visionCentroidsLock, visionCentroidsPrivate, visionCentroidsLength
 	@lock visionCentroidsLock deepcopy(visionCentroidsPrivate[cameraNumber][1:visionCentroidsLength[cameraNumber]])
 end
+
+function getCentroidsNorm(cameraNumber::Int)::Vector{Vector{Int}}
+	centroids = getCentroids(cameraNumber)
+	rows::Vector{Vector{Int}} = [[c.x÷width, c.y÷height] for c in centroids]
+	return rows
+end
+
+#* run required initialisation automatically at inclusion
+makeAccelerationAvailable()
