@@ -115,8 +115,10 @@ function frameLoop()
 		#* read frames into buffers
 		readbytes!.(cameraIos, cameraFrames)
 
+		frozen::Bool = @lock isFreezeFramedLock isFreezeFramed
+
 		#* recalculate output frame and masks
-		if !(@lock isFreezeFramedLock isFreezeFramed)
+		if !frozen # do not modify frame buffers if supposed to be frozen
 			# acts in place
 			# this function is written in C for speed
 			@ccall accelLib.acceleratedCompositingMaskingLoop(
@@ -132,12 +134,15 @@ function frameLoop()
 		write(ffmpegIo, outputFrame)
 
 		#* use masks to recalculate centroids
-		@lock visionCentroidsLock for i in eachindex(cameraCommands)
-			# also in C and also acts in place
-			visionCentroidsLength[i] = @ccall accelLib.acceleratedCentroidFinding(
-				outputMasks[i]::Ptr{UInt8},
-				visionCentroidsPrivate[i]::Ptr{UInt8}
-			)::Cint
+		if !frozen # only run if new data will be present
+			@lock visionCentroidsLock for i in eachindex(cameraCommands)
+				# also in C and also acts in place
+				visionCentroidsLength[i] = @ccall accelLib.acceleratedCentroidFinding(
+					#! note that this will mangle the outputMasks so cannot be run twice
+					outputMasks[i]::Ptr{UInt8},
+					visionCentroidsPrivate[i]::Ptr{UInt8}
+				)::Cint
+			end
 		end
 
 	end
@@ -166,7 +171,8 @@ end
 
 function getCentroidsNorm(cameraNumber::Int)::Vector{Vector{Int}}
 	centroids = getCentroids(cameraNumber)
-	rows::Vector{Vector{Int}} = [[c.x÷width, c.y÷height] for c in centroids]
+	normFact = 2^16-1
+	rows::Vector{Vector{Int}} = [(normFact.*[c.y, c.x]).÷[width, height] for c in centroids]	#! TODO somewhere along the line these must have got inverted — need to fix this back at the root cause
 	return rows
 end
 

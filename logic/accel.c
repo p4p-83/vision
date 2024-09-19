@@ -82,7 +82,7 @@ static int splatSearch(mask m, int startX, int startY, Centroid centroidsList[MA
 		ysum += thisPoint.y;
 
 		// update pixel to show we've been here
-		m[thisPoint.x][thisPoint.y] = 2;
+		pixelAt(thisPoint.x, thisPoint.y) = 2;
 
 		// helper macro
 		// test if pixel needs to be added to search, and then add it if so
@@ -180,7 +180,7 @@ void acceleratedCompositingMaskingLoop(
 
 	}
 
-	// mask2frame(mboard, fout);
+	mask2frame(mboard, fout);
 
 }
 
