@@ -1,5 +1,5 @@
 #* user settings
-const fps::Int = 25											# framerate, s⁻¹
+const fps::Int = 15											# framerate, s⁻¹
 const width::Int = 64*16									# multiples of 64 work best
 const height::Int = 64*16
 
@@ -29,7 +29,7 @@ const cameraCommands::Vector{Cmd} = [
 	`rpicam-vid --flush -t 0 --camera 1 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
 ]
 
-const ffmpegCommand::Cmd = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
+const ffmpegCommand::Cmd = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`
 
 const mediaMtxCommand::Cmd = `bash -c "cd $accelCFileDir/../stream/mediamtx; ./mediamtx"`
 
