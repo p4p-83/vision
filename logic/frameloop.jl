@@ -1,5 +1,5 @@
 #* user settings
-const fps::Int = 15											# framerate, s⁻¹
+const fps::Int = 25											# framerate, s⁻¹
 const width::Int = 64*16									# multiples of 64 work best
 const height::Int = 64*16
 
