@@ -26,7 +26,7 @@ const samplesPerFrame::Int = samplesLuma + 2samplesChroma 	# YUV
 #* commands
 const cameraCommands::Vector{Cmd} = [
 	`rpicam-vid --flush -t 0 --camera 0 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
-	`rpicam-vid --flush -t 0 --camera 1 --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
+	`rpicam-vid --flush -t 0 --camera 1 --vflip --nopreview --codec yuv420 --framerate $fps --width $width --height $height --inline --listen -o -`
 ]
 
 const ffmpegCommand::Cmd = `ffmpeg -f rawvideo -pix_fmt yuv420p -s:v $(width)x$(height) -i /dev/stdin -c:v libx264 -preset ultrafast -tune zerolatency -fpsmax $fps -f rtsp rtsp://localhost:$rtspPort/$mtxPath`

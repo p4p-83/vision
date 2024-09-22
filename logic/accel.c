@@ -179,8 +179,23 @@ void acceleratedCompositingMaskingLoop(
 		#undef inRange
 
 	}
-
+	
 	// mask2frame(mboard, fout);
+
+	// paint a crosshair
+	// for (int n = 0; n <= 8; ++n) {
+
+	// 	fout->u[WIDTH/4 + n][HEIGHT/4] = 255;
+	// 	fout->u[WIDTH/4 - n][HEIGHT/4] = 255;
+	// 	fout->u[WIDTH/4][HEIGHT/4 + n] = 255;
+	// 	fout->u[WIDTH/4][HEIGHT/4 - n] = 255;
+
+	// 	fout->v[WIDTH/4 + n][HEIGHT/4] = 255;
+	// 	fout->v[WIDTH/4 - n][HEIGHT/4] = 255;
+	// 	fout->v[WIDTH/4][HEIGHT/4 + n] = 255;
+	// 	fout->v[WIDTH/4][HEIGHT/4 - n] = 255;
+
+	// }
 
 }
 
