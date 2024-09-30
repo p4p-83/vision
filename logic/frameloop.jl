@@ -120,7 +120,6 @@ function frameLoop()
 		#* read frames into buffers
 		readbytes!.(cameraIos, cameraFrames)
 
-		frozen::Bool = @lock isFreezeFramedLock isFreezeFramed
 		mode::CompositingModes = @lock composingModeLock composingMode
 		
 		co = @lock compositingOffsetsLock compositingOffsets_px
@@ -163,14 +162,18 @@ function frameLoop()
 		elseif mode==frozen
 			# send without trying to recompute anything
 			write(ffmpegIo, cameraFrames[1])
+
 		elseif mode==ONLYUP
 			# send upward camera image without computing anything
 			write(ffmpegIo, cameraFrames[2])
+
 		elseif mode==ONLYDOWN
 			# send downward camera image without computing anything
 			write(ffmpegIo, cameraFrames[1])
+
 		else
 			@error "Unimplemented"
+
 		end
 
 	end
