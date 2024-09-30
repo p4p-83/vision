@@ -205,10 +205,15 @@ function getCentroids(cameraNumber::Int)::Vector{Centroid}
 	@lock visionCentroidsLock deepcopy(visionCentroidsPrivate[cameraNumber][1:visionCentroidsLength[cameraNumber]])
 end
 
-function getCentroidsNorm(cameraNumber::Int)::Vector{Vector{Int}}
+function getCentroidsNormed(cameraNumber::Int)::Vector{Vector{Fixed{Int16, 16}}}
 	centroids = getCentroids(cameraNumber)
-	normFact = 2^16-1
-	rows::Vector{Vector{Int}} = [(normFact.*[c.y, c.x]).÷[width, height] for c in centroids]	#! TODO somewhere along the line these must have got inverted — need to fix this back at the root cause
+	return [@. Fixed{Int16, 16}(float([c.y, c.x])/[width, height]) for c in centroids]
+end
+
+function getCentroidsRescaled(cameraNumber::Int)::Vector{Vector{Int}}
+	centroids = getCentroids(cameraNumber)
+	rescalingFactor = 2^16
+	rows::Vector{Vector{Int}} = [(rescalingFactor.*[c.y, c.x]).÷[width, height] for c in centroids]	#! TODO somewhere along the line these must have got inverted — need to fix this back at the root cause
 	return rows
 end
 
