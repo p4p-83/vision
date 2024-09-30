@@ -1,7 +1,6 @@
 module Vision
 export beginVision, endVision, getCentroids, setFreezeFramed
-using Crayons.Box
-using Base.Threads
+using Crayons.Box, Base.Threads, FixedPointNumbers
 
 #* dependencies
 include("common.jl")

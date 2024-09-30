@@ -199,6 +199,60 @@ void acceleratedCompositingMaskingLoop(
 
 }
 
+void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffsetX, int compositingOffsetY) {
+
+	#define mean(pixel1, pixel2) ((typeof(pixel1))(((int)(pixel1)+(int)(pixel2))/2))
+	#define Y(frame, lx, ly) frame->y[lx][ly]
+	#define U(frame, cx, cy) frame->u[cx][cy]
+	#define V(frame, cx, cy) frame->v[cx][cy]
+	#define A(mask, lx, ly) mask[lx][ly]
+	#define isInRange(value, lowerBound, upperBound) (((value) >= (lowerBound)) && ((value) <= (upperBound)))
+
+	// make mpri from fpri
+	for (int lumax = 0; lumax < WIDTH; ++lumax) for (int lumay = 0; lumay < HEIGHT; ++lumay) {
+		A(mpri, lumax, lumay) = isInRange(Y(fpri, lumax, lumay), MASK_BOARD_CUT_IN, MASK_BOARD_CUT_OUT);
+	}
+
+	// make maux from faux
+	// composite faux onto fpi within target range
+	for (int plx = 2*WIDTH/5; plx <= 3*WIDTH/5; ++plx) for (int ply = 2*HEIGHT/5; ply < 3*WIDTH/5; ++ply) {
+
+		// index variable naming format:
+		// <p|a><l|c><x|y>
+		// [p]rimary frame/mask or [a]uxiliary frame/mask
+		// [l]uma coord or [c]hroma coord
+		// [x] coord or [y] coord
+
+		// get indecies in order
+		const int pcx = plx/2;
+		const int pcy = ply/2;
+
+		const int alx = plx+compositingOffsetX;
+		const int aly = ply+compositingOffsetY;
+		
+		const int acx = alx/2;
+		const int acy = aly/2;
+
+		// masking
+		//* note that I do datum offset correction here, all baked in
+		A(maux, plx, ply) = isInRange(Y(faux, alx, aly), MASK_COMP_CUT_IN, MASK_COMP_CUT_OUT);
+
+		// compositing
+		Y(fpri, plx, ply) = mean(Y(fpri, plx, ply), Y(faux, alx, aly))
+		U(fpri, pcx, pcy) = mean(U(fpri, pcx, pcy), U(faux, acx, acy))
+		V(fpri, pcx, pcy) = mean(V(fpri, pcx, pcy), V(faux, acx, acy))
+
+	}
+
+	#undef mean
+	#undef Y
+	#undef U
+	#undef V
+	#undef A
+	#undef inRange
+
+}
+
 /**
  * acceleratedCentroidFinding
  * Takes a mask and reduces it to a list of centroids.

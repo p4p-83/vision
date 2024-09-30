@@ -40,6 +40,9 @@ runFrameLoopLock::ReentrantLock = ReentrantLock()
 isFreezeFramed::Bool = false
 isFreezeFramedLock::ReentrantLock = ReentrantLock()
 
+compositingOffsets_px::Vector{Cint} = [0, 0]
+compositingOffsetsLock::ReentrantLock = ReentrantLock()
+
 #* public assets
 visionCentroidsPrivate::Vector{Vector{Centroid}} = [fill(Centroid(-1,-1,-1), searchMaxNumCentroids) for _ in cameraCommands]
 visionCentroidsLength::Vector{Int} = [0 for _ in cameraCommands]
@@ -89,6 +92,7 @@ function frameLoop()
 	global runFrameLoop, runFrameLoopLock
 	global visionCentroidsPrivate, visionCentroidsLength, visionCentroidsLock
 	global isFreezeFramed, isFreezeFramedLock
+	global compositingOffsets_px, compositingOffsetsLock
 
 	#* ensure there isn't already an instance obviously running
 	rfl = @lock runFrameLoopLock runFrameLoop
@@ -96,7 +100,7 @@ function frameLoop()
 	
 	#* preallocate frame buffers and mask buffers
 	cameraFrames::Vector{Vector{UInt8}} = [zeros(UInt8, samplesPerFrame) for _ in cameraCommands]
-	outputFrame::Vector{UInt8} = zeros(UInt8, samplesPerFrame)
+	# outputFrame::Vector{UInt8} = zeros(UInt8, samplesPerFrame)
 	outputMasks::Vector{Matrix{UInt8}} = [zeros(UInt8, height, width) for _ in cameraCommands] #? BUGS is this the right order height,width?
 
 	#* open resources
@@ -116,17 +120,29 @@ function frameLoop()
 		readbytes!.(cameraIos, cameraFrames)
 
 		frozen::Bool = @lock isFreezeFramedLock isFreezeFramed
+		
+		co = @lock compositingOffsetsLock compositingOffsets_px
+		compositingOffsetX = co[1]
+		compositingOffsetY = co[2]
 
 		#* recalculate output frame and masks
 		if !frozen # do not modify frame buffers if supposed to be frozen
 			# acts in place
 			# this function is written in C for speed
-			@ccall accelLib.acceleratedCompositingMaskingLoop(
+			# @ccall accelLib.acceleratedCompositingMaskingLoop(
+			# 	cameraFrames[1]::Ptr{UInt8},
+			# 	cameraFrames[2]::Ptr{UInt8},
+			# 	outputFrame::Ptr{UInt8},
+			# 	outputMasks[1]::Ptr{UInt8},
+			# 	outputMasks[2]::Ptr{UInt8}
+			# )::Cvoid
+			@ccall accelLib.acmloop2(
 				cameraFrames[1]::Ptr{UInt8},
 				cameraFrames[2]::Ptr{UInt8},
-				outputFrame::Ptr{UInt8},
 				outputMasks[1]::Ptr{UInt8},
-				outputMasks[2]::Ptr{UInt8}
+				outputMasks[2]::Ptr{UInt8},
+				compositingOffsetX::Cint,
+				compositingOffsetY::Cint
 			)::Cvoid
 		end
 		
@@ -162,6 +178,11 @@ end
 function setFreezeFramed(frozen::Bool)
 	global isFreezeFramed, isFreezeFramedLock
 	@lock isFreezeFramedLock isFreezeFramed = frozen
+end
+
+function setCompositingOffsets(translationOfUpWrtDown_norm::Vector{Fixed{Int16, 16}})
+	global compositingOffsets_px, compositingOffsetsLock
+	@lock compositingOffsetsLock compositingOffsets_px .= (Cint∘round)([width, height] .* float.(translationOfUpWrtDown_norm))
 end
 
 function getCentroids(cameraNumber::Int)::Vector{Centroid}
