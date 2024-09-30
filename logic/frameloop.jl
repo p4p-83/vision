@@ -37,8 +37,9 @@ const mediaMtxCommand::Cmd = `bash -c "cd $accelCFileDir/../stream/mediamtx; ./m
 runFrameLoop::Bool = false
 runFrameLoopLock::ReentrantLock = ReentrantLock()
 
-isFreezeFramed::Bool = false
-isFreezeFramedLock::ReentrantLock = ReentrantLock()
+@enum CompositingModes NORMAL FROZEN ONLYUP ONLYDOWN
+composingMode::CompositingModes = FROZEN
+composingModeLock::ReentrantLock = ReentrantLock()
 
 compositingOffsets_px::Vector{Cint} = [0, 0]
 compositingOffsetsLock::ReentrantLock = ReentrantLock()
@@ -120,13 +121,14 @@ function frameLoop()
 		readbytes!.(cameraIos, cameraFrames)
 
 		frozen::Bool = @lock isFreezeFramedLock isFreezeFramed
+		mode::CompositingModes = @lock composingModeLock composingMode
 		
 		co = @lock compositingOffsetsLock compositingOffsets_px
 		compositingOffsetX = co[1]
 		compositingOffsetY = co[2]
 
-		#* recalculate output frame and masks
-		if !frozen # do not modify frame buffers if supposed to be frozen
+		if mode==NORMAL # do not modify frame buffers if supposed to be frozen
+			#* recalculate output frame and masks
 			# acts in place
 			# this function is written in C for speed
 			# @ccall accelLib.acceleratedCompositingMaskingLoop(
@@ -144,13 +146,11 @@ function frameLoop()
 				compositingOffsetX::Cint,
 				compositingOffsetY::Cint
 			)::Cvoid
-		end
-		
-		#* dispatch composited frame to FFmpeg
-		write(ffmpegIo, outputFrame)
 
-		#* use masks to recalculate centroids
-		if !frozen # only run if new data will be present
+			#* dispatch composited frame to FFmpeg
+			write(ffmpegIo, cameraFrames[1])
+
+			#* use masks to recalculate centroids
 			@lock visionCentroidsLock for i in eachindex(cameraCommands)
 				# also in C and also acts in place
 				visionCentroidsLength[i] = @ccall accelLib.acceleratedCentroidFinding(
@@ -159,6 +159,18 @@ function frameLoop()
 					visionCentroidsPrivate[i]::Ptr{UInt8}
 				)::Cint
 			end
+
+		elseif mode==frozen
+			# send without trying to recompute anything
+			write(ffmpegIo, cameraFrames[1])
+		elseif mode==ONLYUP
+			# send upward camera image without computing anything
+			write(ffmpegIo, cameraFrames[2])
+		elseif mode==ONLYDOWN
+			# send downward camera image without computing anything
+			write(ffmpegIo, cameraFrames[1])
+		else
+			@error "Unimplemented"
 		end
 
 	end
@@ -175,9 +187,9 @@ function cancelFrameLoop()
 	@lock runFrameLoopLock runFrameLoop = false
 end
 
-function setFreezeFramed(frozen::Bool)
-	global isFreezeFramed, isFreezeFramedLock
-	@lock isFreezeFramedLock isFreezeFramed = frozen
+function setCompositingMode(mode::CompositingModes)
+	global composingMode, composingModeLock
+	@lock composingModeLock composingMode = mode
 end
 
 function setCompositingOffsets(translationOfUpWrtDown_norm::Vector{Fixed{Int16, 16}})
