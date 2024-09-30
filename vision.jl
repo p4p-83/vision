@@ -1,9 +1,12 @@
 module Vision
-export beginVision, endVision, getCentroids, setCompositingMode, ComposingModes
+export beginVision, endVision, setCompositingMode, ComposingModes
 using Crayons.Box, Base.Threads, FixedPointNumbers
 
+const j::ComplexF64 = im
+const °::Float64 = 2π/360	# multiplicative degrees to radians conversion factor
+FI16 = Fixed{Int16, 16}
+
 #* dependencies
-include("common.jl")
 include("logic/frameloop.jl")
 
 #* internal functions
@@ -43,11 +46,11 @@ function ensureMediaMtx()
 end
 
 #* data extraction functions
-function getCentroids()::Tuple{Vector{Centroid}, Vector{Centroid}}
-	pads = getCentroids(1)
-	leads = getCentroids(2)
-	return (leads, pads)
-end
+# function getCentroids()::Tuple{Vector{Centroid}, Vector{Centroid}}
+# 	pads = getCentroids(1)
+# 	leads = getCentroids(2)
+# 	return (leads, pads)
+# end
 
 #* control functions
 function beginVision()

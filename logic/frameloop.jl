@@ -44,7 +44,11 @@ composingModeLock::ReentrantLock = ReentrantLock()
 compositingOffsets_px::Vector{Cint} = [0, 0]
 compositingOffsetsLock::ReentrantLock = ReentrantLock()
 
-#* public assets
+struct Centroid
+	x::Cint
+	y::Cint
+	weight::Cint
+end
 visionCentroidsPrivate::Vector{Vector{Centroid}} = [fill(Centroid(-1,-1,-1), searchMaxNumCentroids) for _ in cameraCommands]
 visionCentroidsLength::Vector{Int} = [0 for _ in cameraCommands]
 visionCentroidsLock::ReentrantLock = ReentrantLock()
@@ -200,22 +204,37 @@ function setCompositingOffsets(translationOfUpWrtDown_norm::Vector{Fixed{Int16, 
 	@lock compositingOffsetsLock compositingOffsets_px .= (Cint∘round)([width, height] .* float.(translationOfUpWrtDown_norm))
 end
 
-function getCentroids(cameraNumber::Int)::Vector{Centroid}
-	global visionCentroidsLock, visionCentroidsPrivate, visionCentroidsLength
-	@lock visionCentroidsLock deepcopy(visionCentroidsPrivate[cameraNumber][1:visionCentroidsLength[cameraNumber]])
+# function getCentroids(cameraNumber::Int)::Vector{Centroid}
+# 	global visionCentroidsLock, visionCentroidsPrivate, visionCentroidsLength
+# 	@lock visionCentroidsLock deepcopy(visionCentroidsPrivate[cameraNumber][1:visionCentroidsLength[cameraNumber]])
+# end
+
+# returns normalised [-0.5, 0.5) centroids as fixed point
+function getCentroids(cameraNumber::Int)::Vector{FI16}
+	global visionCentroidsPrivate, visionCentroidsLength, visionCentroidsLock
+
+	lock(visionCentroidsLock)
+	N = visionCentroidsLength[cameraNumber]
+	centroids::Vector{FI16} = [
+		FI16.(float.([c.x, c.y]) ./ [width, height])
+		for c in visionCentroidsPrivate[cameraNumber][1:N]
+	]
+	unlock(visionCentroidsLock)
+	
+	return centroids
 end
 
-function getCentroidsNormed(cameraNumber::Int)::Vector{Vector{Fixed{Int16, 16}}}
-	centroids = getCentroids(cameraNumber)
-	return [@. Fixed{Int16, 16}(float([c.y, c.x])/[width, height]) for c in centroids]
-end
+# function getCentroidsNormed(cameraNumber::Int)::Vector{Vector{Fixed{Int16, 16}}}
+# 	centroids = getCentroids(cameraNumber)
+# 	return [@. Fixed{Int16, 16}(float([c.y, c.x])/[width, height]) for c in centroids]
+# end
 
-function getCentroidsRescaled(cameraNumber::Int)::Vector{Vector{Int}}
-	centroids = getCentroids(cameraNumber)
-	rescalingFactor = 2^16
-	rows::Vector{Vector{Int}} = [(rescalingFactor.*[c.y, c.x]).÷[width, height] for c in centroids]	#! TODO somewhere along the line these must have got inverted — need to fix this back at the root cause
-	return rows
-end
+# function getCentroidsRescaled(cameraNumber::Int)::Vector{Vector{Int}}
+# 	centroids = getCentroids(cameraNumber)
+# 	rescalingFactor = 2^16
+# 	rows::Vector{Vector{Int}} = [(rescalingFactor.*[c.y, c.x]).÷[width, height] for c in centroids]	#! TODO somewhere along the line these must have got inverted — need to fix this back at the root cause
+# 	return rows
+# end
 
 #* run required initialisation automatically at inclusion
 makeAccelerationAvailable()
