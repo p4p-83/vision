@@ -37,8 +37,9 @@ const mediaMtxCommand::Cmd = `bash -c "cd $accelCFileDir/../stream/mediamtx; ./m
 runFrameLoop::Bool = false
 runFrameLoopLock::ReentrantLock = ReentrantLock()
 
-@enum CompositingModes NORMAL FROZEN ONLYUP ONLYDOWN
-composingMode::CompositingModes = FROZEN
+using EnumX
+@enumx CompositingModes NORMAL FROZEN ONLYUP ONLYDOWN
+composingMode::CompositingModes.T = CompositingModes.FROZEN
 composingModeLock::ReentrantLock = ReentrantLock()
 
 compositingOffsets_px::Vector{Cint} = [0, 0]
@@ -124,13 +125,13 @@ function frameLoop()
 		#* read frames into buffers
 		readbytes!.(cameraIos, cameraFrames)
 
-		mode::CompositingModes = @lock composingModeLock composingMode
+		mode::CompositingModes.T = @lock composingModeLock composingMode
 		
 		co = @lock compositingOffsetsLock compositingOffsets_px
 		compositingOffsetX = co[1]
 		compositingOffsetY = co[2]
 
-		if mode==NORMAL # do not modify frame buffers if supposed to be frozen
+		if mode==CompositingModes.NORMAL # do not modify frame buffers if supposed to be frozen
 			#* recalculate output frame and masks
 			# acts in place
 			# this function is written in C for speed
@@ -163,15 +164,15 @@ function frameLoop()
 				)::Cint
 			end
 
-		elseif mode==frozen
+		elseif mode==CompositingModes.FROZEN
 			# send without trying to recompute anything
 			write(ffmpegIo, cameraFrames[1])
 
-		elseif mode==ONLYUP
+		elseif mode==CompositingModes.ONLYUP
 			# send upward camera image without computing anything
 			write(ffmpegIo, cameraFrames[2])
 
-		elseif mode==ONLYDOWN
+		elseif mode==CompositingModes.ONLYDOWN
 			# send downward camera image without computing anything
 			write(ffmpegIo, cameraFrames[1])
 
@@ -194,14 +195,14 @@ function cancelFrameLoop()
 	@lock runFrameLoopLock runFrameLoop = false
 end
 
-function setCompositingMode(mode::CompositingModes)
+function setCompositingMode(mode::CompositingModes.T)
 	global composingMode, composingModeLock
 	@lock composingModeLock composingMode = mode
 end
 
 function setCompositingOffsets(translationOfUpWrtDown_norm::Vector{Fixed{Int16, 16}})
 	global compositingOffsets_px, compositingOffsetsLock
-	@lock compositingOffsetsLock compositingOffsets_px .= (Cint∘round)([width, height] .* float.(translationOfUpWrtDown_norm))
+	@lock compositingOffsetsLock compositingOffsets_px .= (Cint∘round).([width, height] .* float.(translationOfUpWrtDown_norm))
 end
 
 # function getCentroids(cameraNumber::Int)::Vector{Centroid}
