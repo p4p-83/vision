@@ -238,9 +238,9 @@ void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffse
 		A(maux, plx, ply) = isInRange(Y(faux, alx, aly), MASK_COMP_CUT_IN, MASK_COMP_CUT_OUT);
 
 		// compositing
-		Y(fpri, plx, ply) = mean(Y(fpri, plx, ply), Y(faux, alx, aly))
-		U(fpri, pcx, pcy) = mean(U(fpri, pcx, pcy), U(faux, acx, acy))
-		V(fpri, pcx, pcy) = mean(V(fpri, pcx, pcy), V(faux, acx, acy))
+		Y(fpri, plx, ply) = mean(Y(fpri, plx, ply), Y(faux, alx, aly));
+		U(fpri, pcx, pcy) = mean(U(fpri, pcx, pcy), U(faux, acx, acy));
+		V(fpri, pcx, pcy) = mean(V(fpri, pcx, pcy), V(faux, acx, acy));
 
 	}
 
