@@ -1,5 +1,5 @@
 module Vision
-export beginVision, endVision, getCentroids, setFreezeFramed
+export beginVision, endVision, getCentroids, setCompositingMode, ComposingModes
 using Crayons.Box, Base.Threads, FixedPointNumbers
 
 #* dependencies
