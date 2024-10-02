@@ -114,7 +114,7 @@ function frameLoop()
 	sleep(0.2)
 	cameraIos = open.(cameraCommands, "r")
 	ffmpegIo = open(ffmpegCommand, "r+")		# note must be writeable
-	write(ffmpegIo, outputFrame)				# no clue, but it bugs out if I don't do this?!?!
+	write(ffmpegIo, cameraFrames[1])				# no clue, but it bugs out if I don't do this?!?!
 	
 	sleep(0.2)
 
@@ -211,13 +211,13 @@ end
 # end
 
 # returns normalised [-0.5, 0.5) centroids as fixed point
-function getCentroids(cameraNumber::Int)::Vector{FI16}
+function getCentroids(cameraNumber::Int)::Vector{Vector{FI16}}
 	global visionCentroidsPrivate, visionCentroidsLength, visionCentroidsLock
 
 	lock(visionCentroidsLock)
 	N = visionCentroidsLength[cameraNumber]
-	centroids::Vector{FI16} = [
-		FI16.(float.([c.x, c.y]) ./ [width, height])
+	centroids::Vector{Vector{FI16}} = [
+		@. FI16(float([c.x, c.y]) / [width, height] - 0.5)
 		for c in visionCentroidsPrivate[cameraNumber][1:N]
 	]
 	unlock(visionCentroidsLock)

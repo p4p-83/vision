@@ -9,12 +9,13 @@ using .Vision
 
 function printCentroidsToStdOut()
 
-	leads, pads = getCentroids()
+	leads, pads = Vision.getCentroids.([2, 1])
+	# pads = Vision.getCentroids(1)
 
 	println("\n\n\nLeads" |> BOLD |> GREEN_FG)
-	display(DataFrame(leads))
+	display(DataFrame(reduce(hcat, leads)', ["x", "y"]))
 	println("\nPads" |> BOLD |> GREEN_FG)
-	display(DataFrame(pads))
+	display(DataFrame(reduce(hcat, pads)', ["x", "y"]))
 	println()
 
 end
@@ -25,10 +26,10 @@ beginVision()
 #* keep alive
 while true
 
-	Vision.setFreezeFramed(true)
+	Vision.setCompositingMode(Vision.CompositingModes.FROZEN)
 	sleep(1)
 	
-	Vision.setFreezeFramed(false)
+	Vision.setCompositingMode(Vision.CompositingModes.NORMAL)
 	sleep(1)
 
 	printCentroidsToStdOut()

@@ -199,7 +199,7 @@ void acceleratedCompositingMaskingLoop(
 
 }
 
-void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffsetX, int compositingOffsetY) {
+void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffsetY, int compositingOffsetX) {
 
 	#define mean(pixel1, pixel2) ((typeof(pixel1))(((int)(pixel1)+(int)(pixel2))/2))
 	#define Y(frame, lx, ly) frame->y[lx][ly]
@@ -215,7 +215,7 @@ void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffse
 
 	// make maux from faux
 	// composite faux onto fpi within target range
-	for (int plx = 2*WIDTH/5; plx <= 3*WIDTH/5; ++plx) for (int ply = 2*HEIGHT/5; ply < 3*WIDTH/5; ++ply) {
+	for (int plx = 1*WIDTH/4; plx <= 3*WIDTH/4; ++plx) for (int ply = 1*HEIGHT/4; ply < 3*WIDTH/4; ++ply) {
 
 		// index variable naming format:
 		// <p|a><l|c><x|y>
