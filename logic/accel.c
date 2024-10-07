@@ -238,8 +238,8 @@ void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffse
 		A(maux, plx, ply) = isInRange(Y(faux, alx, aly), MASK_COMP_CUT_IN, MASK_COMP_CUT_OUT);
 
 		// chroma keying
-		if (U(faux, acx, acy) > 140) break;
-		if (V(faux, acx, acy) < 110) break;
+		if (U(faux, acx, acy) > 150) break;
+		if (V(faux, acx, acy) < 90) break;
 
 		// compositing
 		Y(fpri, plx, ply) = mean(Y(fpri, plx, ply), Y(faux, alx, aly));
