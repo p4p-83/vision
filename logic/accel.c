@@ -199,7 +199,7 @@ void acceleratedCompositingMaskingLoop(
 
 }
 
-void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffsetY, int compositingOffsetX) {
+void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffsetY, int compositingOffsetX, int nozzleOffsetY, int nozzleOffsetX) {
 
 	#define mean(pixel1, pixel2) ((typeof(pixel1))(((int)(pixel1)+(int)(pixel2))/2))
 	#define Y(frame, lx, ly) frame->y[lx][ly]
@@ -237,12 +237,19 @@ void acmloop2(frame fpri, frame faux, mask mpri, mask maux, int compositingOffse
 		//* note that I do datum offset correction here, all baked in
 		A(maux, plx, ply) = isInRange(Y(faux, alx, aly), MASK_COMP_CUT_IN, MASK_COMP_CUT_OUT);
 
+		// chroma keying
+		if (U(faux, acx, acy) > 140) break;
+		if (V(faux, acx, acy) < 110) break;
+
 		// compositing
 		Y(fpri, plx, ply) = mean(Y(fpri, plx, ply), Y(faux, alx, aly));
 		U(fpri, pcx, pcy) = mean(U(fpri, pcx, pcy), U(faux, acx, acy));
 		V(fpri, pcx, pcy) = mean(V(fpri, pcx, pcy), V(faux, acx, acy));
 
 	}
+
+	for (int lx = 0; lx < WIDTH; ++lx) Y(fpri, lx, HEIGHT/2+nozzleOffsetY) = 255;
+	for (int ly = 0; ly < HEIGHT; ++ly) Y(fpri, WIDTH/2+nozzleOffsetX, ly) = 255;
 
 	#undef mean
 	#undef Y

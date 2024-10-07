@@ -45,6 +45,9 @@ composingModeLock::ReentrantLock = ReentrantLock()
 compositingOffsets_px::Vector{Cint} = [0, 0]
 compositingOffsetsLock::ReentrantLock = ReentrantLock()
 
+nozzleOffsets_px::Vector{Cint} = [0, 0]
+nozzleOffsetsLock::ReentrantLock = ReentrantLock()
+
 struct Centroid
 	x::Cint
 	y::Cint
@@ -131,6 +134,10 @@ function frameLoop()
 		compositingOffsetX = co[1]
 		compositingOffsetY = co[2]
 
+		no = @lock nozzleOffsetsLock nozzleOffsets_px
+		nozzleOffsetX = no[1]
+		nozzleOffsetY = no[2]
+
 		if mode==CompositingModes.NORMAL # do not modify frame buffers if supposed to be frozen
 			#* recalculate output frame and masks
 			# acts in place
@@ -148,7 +155,9 @@ function frameLoop()
 				outputMasks[1]::Ptr{UInt8},
 				outputMasks[2]::Ptr{UInt8},
 				compositingOffsetX::Cint,
-				compositingOffsetY::Cint
+				compositingOffsetY::Cint,
+				nozzleOffsetX::Cint,
+				nozzleOffsetY::Cint
 			)::Cvoid
 
 			#* dispatch composited frame to FFmpeg
@@ -203,6 +212,11 @@ end
 function setCompositingOffsets(translationOfUpWrtDown_norm::Vector{Fixed{Int16, 16}})
 	global compositingOffsets_px, compositingOffsetsLock
 	@lock compositingOffsetsLock compositingOffsets_px .= (Cint∘round).([width, height] .* float.(translationOfUpWrtDown_norm))
+end
+
+function setNozzleOffsets(offsets_norm::Vector{Fixed{Int16, 16}})
+	global nozzleOffsets_px, nozzleOffsetsLock
+	@lock nozzleOffsetsLock nozzleOffsets_px .= (Cint∘round).([width, height] .* float.(offsets_norm))
 end
 
 # function getCentroids(cameraNumber::Int)::Vector{Centroid}
